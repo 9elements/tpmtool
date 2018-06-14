@@ -52,10 +52,15 @@ var (
 	pcrCommandMeasureIndex = pcrCommandMeasure.Flag("pcr", "Set the PCR for the measurement operation").Required().Uint32()
 	pcrCommandMeasureFile  = pcrCommandMeasure.Arg("measure-file", "Data which should be measured").Required().String()
 
-	diskCommand       = kingpin.Command("disk", "Manage cryptsetup sealed devices")
-	diskCommandOpen   = diskCommand.Command("open", "Open cryptsetup partition with sealed key")
-	diskCommandClose  = diskCommand.Command("close", "Close cryptsetup partition")
-	diskCommandReseal = diskCommand.Command("reseal", "Reseal sealed cryptsetup partition with new measurements")
+	diskCommand               = kingpin.Command("disk", "Manage cryptsetup sealed devices")
+	diskCommandFormat         = diskCommand.Command("format", "Formet cryptsetup partition with sealing")
+	diskCommandFormatFile     = diskCommandFormat.Arg("sealed-key-file", "Sealed encryption key").Required().String()
+	diskCommandFormatDevice   = diskCommandFormat.Arg("device", "Device which should be encrypted").Required().String()
+	diskCommandFormatPcrs     = diskCommandFormat.Flag("pcr", "Set the PCRS for the sealing operation").Required().Ints()
+	diskCommandFormatLocality = diskCommandFormat.Flag("locality", "Sets the locality for the sealing operation").Uint8()
+	diskCommandOpen           = diskCommand.Command("open", "Open cryptsetup partition with sealed key")
+	diskCommandClose          = diskCommand.Command("close", "Close cryptsetup partition")
+	diskCommandReseal         = diskCommand.Command("reseal", "Reseal sealed cryptsetup partition with new measurements")
 )
 
 func main() {
@@ -69,43 +74,59 @@ func main() {
 
 	switch kingpin.Parse() {
 	case "status":
-		if err := ShowStatus(); err != nil {
+		if err := Status(); err != nil {
 			log.Panic(err.Error())
 		}
 	case "ek":
-		if err := GetPubEk(); err != nil {
+		if err := Ek(); err != nil {
 			log.Panic(err.Error())
 		}
 	case "owner take":
-		if err := OwnTPM(); err != nil {
+		if err := OwnerTake(); err != nil {
 			log.Panic(err.Error())
 		}
 	case "owner clear":
-		if err := ClearTPM(); err != nil {
+		if err := OwnerClear(); err != nil {
 			log.Panic(err.Error())
 		}
 	case "owner reset-lock":
-		if err := ResetLockTPM(); err != nil {
+		if err := OwnerResetLock(); err != nil {
 			log.Panic(err.Error())
 		}
 	case "crypto seal":
-		if err := Seal(); err != nil {
+		if err := CryptoSeal(); err != nil {
 			log.Panic(err.Error())
 		}
 	case "crypto unseal":
-		if err := Unseal(); err != nil {
+		if err := CryptoUnseal(); err != nil {
 			log.Panic(err.Error())
 		}
 	case "pcr list":
-		if err := PrintPcr(); err != nil {
+		if err := PcrList(); err != nil {
 			log.Panic(err.Error())
 		}
 	case "pcr read":
-		if err := ReadPcr(); err != nil {
+		if err := PcrRead(); err != nil {
 			log.Panic(err.Error())
 		}
 	case "pcr measure":
-		if err := Measure(); err != nil {
+		if err := PcrMeasure(); err != nil {
+			log.Panic(err.Error())
+		}
+	case "disk format":
+		if err := DiskFormat(); err != nil {
+			log.Panic(err.Error())
+		}
+	case "disk open":
+		if err := DiskOpen(); err != nil {
+			log.Panic(err.Error())
+		}
+	case "disk close":
+		if err := DiskClose(); err != nil {
+			log.Panic(err.Error())
+		}
+	case "disk reseal":
+		if err := DiskReseal(); err != nil {
 			log.Panic(err.Error())
 		}
 	default:

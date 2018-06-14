@@ -1,10 +1,12 @@
 package main
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"path/filepath"
 
 	"github.com/insomniacslk/systemboot/pkg/tpm"
 )
@@ -14,7 +16,7 @@ const (
 	DefaultFilePermissions           = 660
 )
 
-func ShowStatus() error {
+func Status() error {
 	tpmInterface, err := tpm.NewTPM()
 	if err != nil {
 		return err
@@ -40,7 +42,7 @@ func ShowStatus() error {
 	return nil
 }
 
-func GetPubEk() error {
+func Ek() error {
 	tpmInterface, err := tpm.NewTPM()
 	if err != nil {
 		return err
@@ -64,7 +66,7 @@ func GetPubEk() error {
 	return nil
 }
 
-func OwnTPM() error {
+func OwnerTake() error {
 	tpmInterface, err := tpm.NewTPM()
 	if err != nil {
 		return err
@@ -79,7 +81,7 @@ func OwnTPM() error {
 	return nil
 }
 
-func ClearTPM() error {
+func OwnerClear() error {
 	tpmInterface, err := tpm.NewTPM()
 	if err != nil {
 		return err
@@ -94,7 +96,7 @@ func ClearTPM() error {
 	return nil
 }
 
-func ResetLockTPM() error {
+func OwnerResetLock() error {
 	tpmInterface, err := tpm.NewTPM()
 	if err != nil {
 		return err
@@ -109,7 +111,7 @@ func ResetLockTPM() error {
 	return nil
 }
 
-func Seal() error {
+func CryptoSeal() error {
 	tpmInterface, err := tpm.NewTPM()
 	if err != nil {
 		return err
@@ -127,7 +129,7 @@ func Seal() error {
 	}
 
 	if tpmInterface.Info().Specification == tpm.TPM12 && len(plainText) > tpm.TPM12MaxKeySize {
-		return errors.New("Plain text file is too big, max 2048 bytes")
+		return errors.New("Plain text file is too big, max 256 bytes")
 	}
 
 	sealed, err := tpmInterface.SealData(*cryptoCommandSealLocality, *cryptoCommandSealPcrs, plainText, *cryptoCommandSrkPassword)
@@ -141,7 +143,7 @@ func Seal() error {
 	return err
 }
 
-func Unseal() error {
+func CryptoUnseal() error {
 	tpmInterface, err := tpm.NewTPM()
 	if err != nil {
 		return err
@@ -163,7 +165,7 @@ func Unseal() error {
 	return err
 }
 
-func PrintPcr() error {
+func PcrList() error {
 	tpmInterface, err := tpm.NewTPM()
 	if err != nil {
 		return err
@@ -183,7 +185,7 @@ func PrintPcr() error {
 	return nil
 }
 
-func ReadPcr() error {
+func PcrRead() error {
 	tpmInterface, err := tpm.NewTPM()
 	if err != nil {
 		return err
@@ -204,7 +206,7 @@ func ReadPcr() error {
 	return nil
 }
 
-func Measure() error {
+func PcrMeasure() error {
 	tpmInterface, err := tpm.NewTPM()
 	if err != nil {
 		return err
@@ -225,5 +227,62 @@ func Measure() error {
 	}
 	tpmInterface.Close()
 
+	return nil
+}
+
+func DiskFormat() error {
+	tpmInterface, err := tpm.NewTPM()
+	if err != nil {
+		return err
+	}
+
+	keystorePath, err := MountKeystore()
+	if err != nil {
+		return err
+	}
+
+	randBytes := make([]byte, 64)
+	if _, err = rand.Read(randBytes); err != nil {
+		return err
+	}
+
+	if err = ioutil.WriteFile(keystorePath+"/plain", randBytes, 660); err != nil {
+		return err
+	}
+
+	if !filepath.IsAbs(*diskCommandFormatDevice) {
+		return err
+	}
+
+	err = CryptsetupFormat(keystorePath+"/plain", *diskCommandFormatDevice)
+	if err != nil {
+		return err
+	}
+
+	sealed, err := tpmInterface.SealData(*diskCommandFormatLocality, *diskCommandFormatPcrs, randBytes, "")
+	if err != nil {
+		return err
+	}
+
+	if !filepath.IsAbs(*diskCommandFormatFile) {
+		return err
+	}
+
+	if err = ioutil.WriteFile(*diskCommandFormatFile, sealed, 660); err != nil {
+		return err
+	}
+
+	return UnmountKeystore(keystorePath)
+}
+
+func DiskOpen() error {
+	return nil
+}
+
+func DiskClose() error {
+	return nil
+}
+
+func DiskReseal() error {
 	return nil
 }
