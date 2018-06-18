@@ -9,7 +9,7 @@ tpmtool is a tool for TPM interaction and disk encryption. It is written in pure
 * __Currently only TSPI for TPM specification 1.2 is available.__
 
 ## Core Features
-* Shows TPM status.
+* Shows the TPM status.
 ```bash
 TPM Manufacturer:          STMicroelectronics
 TPM spec:                  1.2
@@ -18,11 +18,11 @@ TPM activated:             true
 TPM enabled:               true
 TPM temporary deactivated: false
 ```
-* Dumps Endorsement Key to file and shows fingerprint.
+* Dumps Endorsement Key into a file and shows the fingerprint.
 * Takes ownership of the TPM.
 * Clears ownership of the TPM.
-* Resets TPM lock in case of activate bruteforce detection.
-* Sealing/Unsealing credentials with Custom/Current set of PCRs.
+* Resets TPM lock in case of active bruteforce detection.
+* Sealing/Unsealing credentials with custom/current set of PCRs.
 * List and read PCRs
 * Measures a file into given PCR index.
 * Crypsetup:
