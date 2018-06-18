@@ -1,7 +1,6 @@
-# tpmtool
 tpmtool is a tool for TPM interaction and disk encryption. It is written in pure Go.
 
-## Basic Features
+# Basic Features
 * Supports TPM 1.2 and 2.0 with [Go TSS](https://github.com/google/go-tpm).
 * Higher TPM abstraction layer (TSPI) is implemented in the [systemboot](https://github.com/systemboot/systemboot).
 * Written in pure Go.
@@ -9,7 +8,7 @@ tpmtool is a tool for TPM interaction and disk encryption. It is written in pure
 * Automatic TSS selection based on TPM version.
 * __Currently only TSPI for TPM specification 1.2 is available.__
 
-### Core Features
+## Core Features
 * Shows TPM status.
 ```bash
 TPM Manufacturer:          STMicroelectronics
@@ -32,7 +31,7 @@ TPM temporary deactivated: false
   * Close device.
   * Measure device luks header into a given PCR.
 
-## Dependencies
+# Dependencies
 
 * __cryptsetup__ binary is required for the disk commands.
 
