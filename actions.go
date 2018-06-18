@@ -6,14 +6,18 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"os"
+	//"path"
 	"path/filepath"
 
+	//"github.com/systemboot/systemboot/pkg/storage"
 	"github.com/systemboot/systemboot/pkg/tpm"
 )
 
 const (
 	MaxPlatformConfigurationRegister = 24
 	DefaultFilePermissions           = 660
+	Luks1HeaderLength                = 2048
 )
 
 func Status() error {
@@ -276,13 +280,83 @@ func DiskFormat() error {
 }
 
 func DiskOpen() error {
-	return nil
+	tpmInterface, err := tpm.NewTPM()
+	if err != nil {
+		return err
+	}
+
+	keystorePath, err := MountKeystore()
+	if err != nil {
+		return err
+	}
+
+	if !filepath.IsAbs(*diskCommandOpenSealFile) {
+		return err
+	}
+
+	if !filepath.IsAbs(*diskCommandOpenDevice) {
+		return err
+	}
+
+	if _, err := os.Stat(*diskCommandOpenMountPath); os.IsNotExist(err) {
+		return err
+	}
+
+	sealedFile, err := ioutil.ReadFile(*diskCommandOpenSealFile)
+	if err != nil {
+		return err
+	}
+
+	sealed, err := tpmInterface.UnsealData(sealedFile, tpm.WellKnownSecret)
+	if err != nil {
+		return err
+	}
+
+	if err = ioutil.WriteFile(keystorePath+"/plain", sealed, 660); err != nil {
+		return err
+	}
+
+	deviceName, err := CryptsetupOpen(keystorePath+"/plain", *diskCommandOpenDevice)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Sealed encrypted device mounted with name: %s\n", deviceName)
+
+	return UnmountKeystore(keystorePath)
 }
 
 func DiskClose() error {
-	return nil
+	//deviceMapperPath := path.Join("/dev/mapper/", *diskCommandCloseName)
+	//storage.GetMountpointByDevice(deviceMapperPath)
+	return CryptsetupClose(*diskCommandCloseName)
+}
+
+func DiskExtend() error {
+	tpmInterface, err := tpm.NewTPM()
+	if err != nil {
+		return err
+	}
+
+	if !filepath.IsAbs(*diskCommandExtendDevice) {
+		return err
+	}
+
+	deviceFD, err := os.Open(*diskCommandExtendDevice)
+	if err != nil {
+		return err
+	}
+	defer deviceFD.Close()
+
+	luksHeader := make([]byte, Luks1HeaderLength)
+	_, err = deviceFD.Read(luksHeader)
+	if err != nil {
+		return err
+	}
+
+	return tpmInterface.Measure(*diskCommandExtendPcr, luksHeader)
 }
 
 func DiskReseal() error {
-	return nil
+	return errors.New("Not implemented!")
 }
