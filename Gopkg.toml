@@ -23,7 +23,7 @@
 
 [[constraint]]
   branch = "master"
-  name = "github.com/insomniacslk/systemboot"
+  name = "github.com/systemboot/systemboot"
 
 [[constraint]]
   name = "gopkg.in/alecthomas/kingpin.v2"

@@ -21,9 +21,9 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/insomniacslk/systemboot"
+  name = "github.com/systemboot/systemboot"
   packages = ["pkg/tpm"]
-  revision = "476b5947ce0c50f026c129650d2e04e7d34c8aa1"
+  revision = "85bfd8d34a62857d177a503753b39fe2f9757020"
 
 [[projects]]
   name = "gopkg.in/alecthomas/kingpin.v2"
@@ -34,6 +34,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "9f0656fe22465968f080ebd51016f5bf3f3594db427676c8c92b0ca84c7b727c"
+  inputs-digest = "d13c1ef7afe752e9041235a72ee1453016e019d81520c04b6d5987ebc6e8c528"
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -8,7 +8,7 @@ import (
 	"io/ioutil"
 	"path/filepath"
 
-	"github.com/insomniacslk/systemboot/pkg/tpm"
+	"github.com/systemboot/systemboot/pkg/tpm"
 )
 
 const (
