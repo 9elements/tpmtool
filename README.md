@@ -25,7 +25,7 @@ TPM temporary deactivated: false
 * Sealing/Unsealing credentials with custom/current set of PCRs.
 * List and read PCRs
 * Measures a file into given PCR index.
-* Crypsetup:
+* Cryptsetup:
   * Format device and seal credential.
   * Open device by sealed credential.
   * Close device.
