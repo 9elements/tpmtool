@@ -36,6 +36,10 @@ TPM temporary deactivated: false
     -   Close device.
     -   Measure device luks header into a given PCR.
 
+# Package Availability
+
+[![Packaging status](https://repology.org/badge/vertical-allrepos/qtpass.svg)](https://repology.org/metapackage/tpmtool)
+
 # Dependencies
 
 -   [Cryptsetup](https://gitlab.com/cryptsetup/cryptsetup) binary is required for the disk commands.
