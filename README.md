@@ -38,7 +38,7 @@ TPM temporary deactivated: false
 
 # Package Availability
 
-[![Packaging status](https://repology.org/badge/vertical-allrepos/qtpass.svg)](https://repology.org/metapackage/tpmtool)
+[![Packaging status](https://repology.org/badge/vertical-allrepos/tpmtool.svg)](https://repology.org/metapackage/tpmtool)
 
 # Dependencies
 
