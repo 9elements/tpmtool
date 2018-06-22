@@ -58,14 +58,6 @@ func CryptsetupFormat(keyPath string, devicePath string) error {
 		return err
 	}
 
-	if !filepath.IsAbs(keyPath) {
-		return err
-	}
-
-	if !filepath.IsAbs(devicePath) {
-		return err
-	}
-
 	cmd := exec.Command(cryptsetup, DefaultFormatParams, "-d", keyPath, "luksFormat", devicePath)
 
 	return cmd.Run()
@@ -75,14 +67,6 @@ func CryptsetupFormat(keyPath string, devicePath string) error {
 func CryptsetupOpen(keyPath string, devicePath string) (string, error) {
 	cryptsetup, err := exec.LookPath(CryptsetupBinary)
 	if err != nil {
-		return "", err
-	}
-
-	if !filepath.IsAbs(keyPath) {
-		return "", err
-	}
-
-	if !filepath.IsAbs(devicePath) {
 		return "", err
 	}
 
@@ -109,10 +93,6 @@ func CryptsetupClose(deviceName string) error {
 	}
 
 	devicePath := path.Join(DefaultDevMapperPath, deviceName)
-	if !filepath.IsAbs(devicePath) {
-		return err
-	}
-
 	cmd := exec.Command(cryptsetup, "luksClose", devicePath)
 
 	return cmd.Run()

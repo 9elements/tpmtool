@@ -21,6 +21,9 @@ var (
 	// TPMDevice which should be used
 	tpmDevice = kingpin.Flag("device", "TPM device path").Default("/dev/tpm0").String()
 
+	// TPMInterface is a global TPM interface
+	TPMInterface tpm.TPM
+
 	// CommandLine Arguments
 	status = kingpin.Command("status", "Show the TPM status information")
 
@@ -102,7 +105,13 @@ func main() {
 	if err != nil {
 		log.Fatal("Please run this tool as root user")
 	}
-	defer file.Close()
+	file.Close()
+
+	TPMInterface, err = tpm.NewTPM()
+	if err != nil {
+		log.Fatal("Can't open TPM interface: " + err.Error())
+	}
+	defer TPMInterface.Close()
 
 	switch kingpin.Parse() {
 	case "status":

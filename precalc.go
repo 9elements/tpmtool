@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 
 	"github.com/koding/multiconfig"
 	"github.com/systemboot/systemboot/pkg/tpm"
@@ -44,13 +43,7 @@ var TPM1DefaultPCRMap = map[int][]byte{
 }
 
 func hashSum(data []byte) ([]byte, error) {
-	tpmInterface, err := tpm.NewTPM()
-	if err != nil {
-		return nil, err
-	}
-	defer tpmInterface.Close()
-
-	if tpmInterface.Info().Specification == tpm.TPM12 {
+	if TPMInterface.Info().Specification == tpm.TPM12 {
 		hash := sha1.Sum(data)
 		return hash[:], nil
 	}
@@ -65,13 +58,7 @@ func StaticPCR(pcrIndex int, hash []byte) {
 
 // DynamicPCR gets the current PCR and populates it into the map
 func DynamicPCR(pcrIndex int) error {
-	tpmInterface, err := tpm.NewTPM()
-	if err != nil {
-		return err
-	}
-	defer tpmInterface.Close()
-
-	hash, err := tpmInterface.ReadPCR(uint32(pcrIndex))
+	hash, err := TPMInterface.ReadPCR(uint32(pcrIndex))
 	if err != nil {
 		return err
 	}
@@ -93,10 +80,6 @@ func ExtendPCR(pcrIndex int, hash []byte) error {
 
 // MeasurePCR measures a file into a PCR
 func MeasurePCR(pcrIndex int, filePath string) error {
-	if !filepath.IsAbs(filePath) {
-		return errors.New("File path not absolute")
-	}
-
 	file, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return err
@@ -119,16 +102,6 @@ func MeasurePCR(pcrIndex int, filePath string) error {
 
 // LuksPCR extends the hash of a LUKS device into a current PCR
 func LuksPCR(pcrIndex int, devicePath string) error {
-	tpmInterface, err := tpm.NewTPM()
-	if err != nil {
-		return err
-	}
-	defer tpmInterface.Close()
-
-	if !filepath.IsAbs(devicePath) {
-		return err
-	}
-
 	deviceFD, err := os.Open(devicePath)
 	if err != nil {
 		return err
@@ -176,15 +149,21 @@ func runCalculations(calculations []PreCalculation, pcrIndex int) error {
 				return errors.New("Extend type: No hashes defined")
 			}
 			for _, hash := range calculation.Hashes {
-				return ExtendPCR(pcrIndex, []byte(hash))
+				if err := ExtendPCR(pcrIndex, []byte(hash)); err != nil {
+					return err
+				}
 			}
+			return nil
 		case Measure:
 			if len(calculation.FilePaths) <= 0 {
 				return errors.New("Measure type: No paths defined")
 			}
 			for _, path := range calculation.FilePaths {
-				return MeasurePCR(pcrIndex, path)
+				if err := MeasurePCR(pcrIndex, path); err != nil {
+					return err
+				}
 			}
+			return nil
 		case Luks:
 			if calculation.DevicePath == "" {
 				return errors.New("Luks type: No path defined")
@@ -200,99 +179,147 @@ func runCalculations(calculations []PreCalculation, pcrIndex int) error {
 
 func executeConfig(sealingConfig *TPM1SealingConfig) error {
 	if sealingConfig.Pcr0 != nil {
-		return runCalculations(sealingConfig.Pcr0, 0)
+		if err := runCalculations(sealingConfig.Pcr0, 0); err != nil {
+			return err
+		}
 	}
 
 	if sealingConfig.Pcr1 != nil {
-		return runCalculations(sealingConfig.Pcr1, 1)
+		if err := runCalculations(sealingConfig.Pcr1, 1); err != nil {
+			return err
+		}
 	}
 
 	if sealingConfig.Pcr2 != nil {
-		return runCalculations(sealingConfig.Pcr2, 2)
+		if err := runCalculations(sealingConfig.Pcr2, 2); err != nil {
+			return err
+		}
 	}
 
 	if sealingConfig.Pcr3 != nil {
-		return runCalculations(sealingConfig.Pcr3, 3)
+		if err := runCalculations(sealingConfig.Pcr3, 3); err != nil {
+			return err
+		}
 	}
 
 	if sealingConfig.Pcr4 != nil {
-		return runCalculations(sealingConfig.Pcr4, 4)
+		if err := runCalculations(sealingConfig.Pcr4, 4); err != nil {
+			return err
+		}
 	}
 
 	if sealingConfig.Pcr5 != nil {
-		return runCalculations(sealingConfig.Pcr5, 5)
+		if err := runCalculations(sealingConfig.Pcr5, 5); err != nil {
+			return err
+		}
 	}
 
 	if sealingConfig.Pcr6 != nil {
-		return runCalculations(sealingConfig.Pcr6, 6)
+		if err := runCalculations(sealingConfig.Pcr6, 6); err != nil {
+			return err
+		}
 	}
 
 	if sealingConfig.Pcr7 != nil {
-		return runCalculations(sealingConfig.Pcr7, 7)
+		if err := runCalculations(sealingConfig.Pcr7, 7); err != nil {
+			return err
+		}
 	}
 
 	if sealingConfig.Pcr8 != nil {
-		return runCalculations(sealingConfig.Pcr8, 8)
+		if err := runCalculations(sealingConfig.Pcr8, 8); err != nil {
+			return err
+		}
 	}
 
 	if sealingConfig.Pcr9 != nil {
-		return runCalculations(sealingConfig.Pcr9, 9)
+		if err := runCalculations(sealingConfig.Pcr9, 9); err != nil {
+			return err
+		}
 	}
 
 	if sealingConfig.Pcr10 != nil {
-		return runCalculations(sealingConfig.Pcr10, 10)
+		if err := runCalculations(sealingConfig.Pcr10, 10); err != nil {
+			return err
+		}
 	}
 
 	if sealingConfig.Pcr11 != nil {
-		return runCalculations(sealingConfig.Pcr11, 11)
+		if err := runCalculations(sealingConfig.Pcr11, 11); err != nil {
+			return err
+		}
 	}
 
 	if sealingConfig.Pcr12 != nil {
-		return runCalculations(sealingConfig.Pcr12, 12)
+		if err := runCalculations(sealingConfig.Pcr12, 12); err != nil {
+			return err
+		}
 	}
 
 	if sealingConfig.Pcr13 != nil {
-		return runCalculations(sealingConfig.Pcr13, 13)
+		if err := runCalculations(sealingConfig.Pcr13, 13); err != nil {
+			return err
+		}
 	}
 
 	if sealingConfig.Pcr14 != nil {
-		return runCalculations(sealingConfig.Pcr14, 14)
+		if err := runCalculations(sealingConfig.Pcr14, 14); err != nil {
+			return err
+		}
 	}
 
 	if sealingConfig.Pcr15 != nil {
-		return runCalculations(sealingConfig.Pcr15, 15)
+		if err := runCalculations(sealingConfig.Pcr15, 15); err != nil {
+			return err
+		}
 	}
 
 	if sealingConfig.Pcr16 != nil {
-		return runCalculations(sealingConfig.Pcr16, 16)
+		if err := runCalculations(sealingConfig.Pcr16, 16); err != nil {
+			return err
+		}
 	}
 
 	if sealingConfig.Pcr17 != nil {
-		return runCalculations(sealingConfig.Pcr17, 17)
+		if err := runCalculations(sealingConfig.Pcr17, 17); err != nil {
+			return err
+		}
 	}
 
 	if sealingConfig.Pcr18 != nil {
-		return runCalculations(sealingConfig.Pcr18, 18)
+		if err := runCalculations(sealingConfig.Pcr18, 18); err != nil {
+			return err
+		}
 	}
 
 	if sealingConfig.Pcr19 != nil {
-		return runCalculations(sealingConfig.Pcr19, 19)
+		if err := runCalculations(sealingConfig.Pcr19, 19); err != nil {
+			return err
+		}
 	}
 
 	if sealingConfig.Pcr20 != nil {
-		return runCalculations(sealingConfig.Pcr20, 20)
+		if err := runCalculations(sealingConfig.Pcr20, 20); err != nil {
+			return err
+		}
 	}
 
 	if sealingConfig.Pcr21 != nil {
-		return runCalculations(sealingConfig.Pcr21, 21)
+		if err := runCalculations(sealingConfig.Pcr21, 21); err != nil {
+			return err
+		}
 	}
 
 	if sealingConfig.Pcr22 != nil {
-		return runCalculations(sealingConfig.Pcr22, 22)
+		if err := runCalculations(sealingConfig.Pcr22, 22); err != nil {
+			return err
+		}
 	}
 
 	if sealingConfig.Pcr23 != nil {
-		return runCalculations(sealingConfig.Pcr23, 23)
+		if err := runCalculations(sealingConfig.Pcr23, 23); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -301,15 +328,9 @@ func executeConfig(sealingConfig *TPM1SealingConfig) error {
 // PreCalculate calculates a PCR map by a given sealing configuration
 // doing different types of calculations in the right order
 func PreCalculate(sealingConfigPath string) (map[int][]byte, error) {
-	tpmInterface, err := tpm.NewTPM()
-	if err != nil {
-		return nil, err
-	}
-	defer tpmInterface.Close()
-
 	// Initialize the default values
 	var sealingConf *TPM1SealingConfig
-	if tpmInterface.Info().Specification == tpm.TPM12 {
+	if TPMInterface.Info().Specification == tpm.TPM12 {
 		CurrentPCRMap = TPM1DefaultPCRMap
 		sealingConf = new(TPM1SealingConfig)
 	} else {

@@ -7,7 +7,7 @@ const (
 	// Static is hash of type byte array
 	Static CalculateType = "static"
 	// Dynamic is the current lookup of the PCR value
-	Dynamic CalculateType = "Dynamic"
+	Dynamic CalculateType = "dynamic"
 	// Extend a hash into a PCR
 	Extend CalculateType = "extend"
 	// Measure a file into a PCR

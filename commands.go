@@ -2,17 +2,14 @@ package main
 
 import (
 	"crypto/rand"
-	"crypto/sha1"
 	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
-	"path/filepath"
 	"syscall"
 
-	tspi "github.com/google/go-tpm/tpm"
 	"github.com/systemboot/systemboot/pkg/storage"
 	"github.com/systemboot/systemboot/pkg/tpm"
 )
@@ -28,24 +25,18 @@ const (
 
 // Status Dumps the tpm status
 func Status() error {
-	tpmInterface, err := tpm.NewTPM()
-	if err != nil {
-		return err
-	}
-	defer tpmInterface.Close()
-
-	summary := tpmInterface.Summary()
+	summary := TPMInterface.Summary()
 	fmt.Print(summary)
 
-	if tpmInterface.Info().TemporarilyDeactivated {
+	if TPMInterface.Info().TemporarilyDeactivated {
 		fmt.Println("\nError: Check your BIOS! TPM is temporary deactivated.")
 	}
 
-	if (!tpmInterface.Info().Active || !tpmInterface.Info().Enabled) && !tpmInterface.Info().TemporarilyDeactivated {
+	if (!TPMInterface.Info().Active || !TPMInterface.Info().Enabled) && !TPMInterface.Info().TemporarilyDeactivated {
 		fmt.Println("\nError: TPM is inactive or disabled! Check your BIOS physical presence settings.")
 	}
 
-	if !tpmInterface.Info().Owned {
+	if !TPMInterface.Info().Owned {
 		fmt.Println("\nError: TPM is not owned! Please take ownership of the TPM.")
 	}
 
@@ -54,14 +45,8 @@ func Status() error {
 
 // Ek dumps the Endorsement Key
 func Ek() error {
-	tpmInterface, err := tpm.NewTPM()
-	if err != nil {
-		return err
-	}
-	defer tpmInterface.Close()
-
 	var pubEk []byte
-	pubEk, err = tpmInterface.ReadPubEK(*ekCommandPassword)
+	pubEk, err := TPMInterface.ReadPubEK(*ekCommandPassword)
 	if err != nil {
 		return err
 	}
@@ -79,13 +64,7 @@ func Ek() error {
 
 // OwnerTake takes ownership of the TPM
 func OwnerTake() error {
-	tpmInterface, err := tpm.NewTPM()
-	if err != nil {
-		return err
-	}
-	defer tpmInterface.Close()
-
-	err = tpmInterface.TakeOwnership(*ownerCommandPassword, *ownerCommandTakeSrkPassword)
+	err := TPMInterface.TakeOwnership(*ownerCommandPassword, *ownerCommandTakeSrkPassword)
 	if err != nil {
 		return err
 	}
@@ -95,13 +74,7 @@ func OwnerTake() error {
 
 // OwnerClear clears ownership of the TPM
 func OwnerClear() error {
-	tpmInterface, err := tpm.NewTPM()
-	if err != nil {
-		return err
-	}
-	defer tpmInterface.Close()
-
-	err = tpmInterface.ClearOwnership(*ownerCommandPassword)
+	err := TPMInterface.ClearOwnership(*ownerCommandPassword)
 	if err != nil {
 		return err
 	}
@@ -111,13 +84,7 @@ func OwnerClear() error {
 
 // OwnerResetLock resets the TPM bruteforce lock
 func OwnerResetLock() error {
-	tpmInterface, err := tpm.NewTPM()
-	if err != nil {
-		return err
-	}
-	defer tpmInterface.Close()
-
-	err = tpmInterface.ResetLock(*ownerCommandPassword)
+	err := TPMInterface.ResetLock(*ownerCommandPassword)
 	if err != nil {
 		return err
 	}
@@ -127,12 +94,6 @@ func OwnerResetLock() error {
 
 // CryptoSeal seals data aganst PCR with TPM
 func CryptoSeal() error {
-	tpmInterface, err := tpm.NewTPM()
-	if err != nil {
-		return err
-	}
-	defer tpmInterface.Close()
-
 	for _, pcr := range *cryptoCommandSealPcrs {
 		if pcr >= MaxPlatformConfigurationRegister || pcr < 0 {
 			return errors.New("PCR index is incorrect")
@@ -144,11 +105,11 @@ func CryptoSeal() error {
 		return err
 	}
 
-	if tpmInterface.Info().Specification == tpm.TPM12 && len(plainText) > tpm.TPM12MaxKeySize {
+	if TPMInterface.Info().Specification == tpm.TPM12 && len(plainText) > tpm.TPM12MaxKeySize {
 		return errors.New("Plain text file is too big, max 256 bytes")
 	}
 
-	sealed, err := tpmInterface.SealData(*cryptoCommandSealLocality, *cryptoCommandSealPcrs, plainText, *cryptoCommandSrkPassword)
+	sealed, err := TPMInterface.SealData(*cryptoCommandSealLocality, *cryptoCommandSealPcrs, plainText, *cryptoCommandSrkPassword)
 	if err != nil {
 		return err
 	}
@@ -158,18 +119,12 @@ func CryptoSeal() error {
 
 // CryptoUnseal unseals data by the TPM against PCR
 func CryptoUnseal() error {
-	tpmInterface, err := tpm.NewTPM()
-	if err != nil {
-		return err
-	}
-	defer tpmInterface.Close()
-
 	cipherText, err := ioutil.ReadFile(*cryptoCommandUnsealCipherFile)
 	if err != nil {
 		return err
 	}
 
-	unsealed, err := tpmInterface.UnsealData(cipherText, *cryptoCommandSrkPassword)
+	unsealed, err := TPMInterface.UnsealData(cipherText, *cryptoCommandSrkPassword)
 	if err != nil {
 		return err
 	}
@@ -179,20 +134,6 @@ func CryptoUnseal() error {
 
 // CryptoReseal reseals a data by given sealing configuration
 func CryptoReseal() error {
-	tpmInterface, err := tpm.NewTPM()
-	if err != nil {
-		return err
-	}
-	defer tpmInterface.Close()
-
-	if !filepath.IsAbs(*cryptoCommandResealConfig) {
-		return err
-	}
-
-	if !filepath.IsAbs(*cryptoCommandResealKeyfile) {
-		return err
-	}
-
 	sealedFile, err := ioutil.ReadFile(*cryptoCommandResealKeyfile)
 	if err != nil {
 		return err
@@ -200,15 +141,15 @@ func CryptoReseal() error {
 
 	pcrInfo, err := PreCalculate(*cryptoCommandResealConfig)
 	if err != nil {
-		return nil
+		return err
 	}
 
-	unsealed, err := tpmInterface.UnsealData(sealedFile, *diskCommandSrkPassword)
+	unsealed, err := TPMInterface.UnsealData(sealedFile, *diskCommandSrkPassword)
 	if err != nil {
 		return err
 	}
 
-	sealed, err := resealData(*cryptoCommandResealLocality, pcrInfo, unsealed, *cryptoCommandSrkPassword)
+	sealed, err := TPMInterface.ResealData(tpm.DefaultLocality, pcrInfo, unsealed, *cryptoCommandSrkPassword)
 	if err != nil {
 		return err
 	}
@@ -218,15 +159,9 @@ func CryptoReseal() error {
 
 // PcrList dumps all PCRs
 func PcrList() error {
-	tpmInterface, err := tpm.NewTPM()
-	if err != nil {
-		return err
-	}
-	defer tpmInterface.Close()
-
 	var pcrs string
 	for i := uint32(0); i < MaxPlatformConfigurationRegister; i++ {
-		hash, err := tpmInterface.ReadPCR(i)
+		hash, err := TPMInterface.ReadPCR(i)
 		if err != nil {
 			return err
 		}
@@ -239,17 +174,11 @@ func PcrList() error {
 
 // PcrRead reads the value of a PCR
 func PcrRead() error {
-	tpmInterface, err := tpm.NewTPM()
-	if err != nil {
-		return err
-	}
-	defer tpmInterface.Close()
-
 	if *pcrCommandReadIndex >= MaxPlatformConfigurationRegister || *pcrCommandReadIndex < 0 {
 		return errors.New("PCR index is incorrect")
 	}
 
-	pcr, err := tpmInterface.ReadPCR(*pcrCommandReadIndex)
+	pcr, err := TPMInterface.ReadPCR(*pcrCommandReadIndex)
 	if err != nil {
 		return err
 	}
@@ -261,12 +190,6 @@ func PcrRead() error {
 
 // PcrMeasure measures a file into a defined PCR
 func PcrMeasure() error {
-	tpmInterface, err := tpm.NewTPM()
-	if err != nil {
-		return err
-	}
-	defer tpmInterface.Close()
-
 	if *pcrCommandMeasureIndex >= MaxPlatformConfigurationRegister || *pcrCommandMeasureIndex < 0 {
 		return errors.New("PCR index is incorrect")
 	}
@@ -276,7 +199,7 @@ func PcrMeasure() error {
 		return err
 	}
 
-	err = tpmInterface.Measure(*pcrCommandMeasureIndex, fileToMeasure)
+	err = TPMInterface.Measure(*pcrCommandMeasureIndex, fileToMeasure)
 	if err != nil {
 		return err
 	}
@@ -286,12 +209,6 @@ func PcrMeasure() error {
 
 // DiskFormat formats a device for luks setup.
 func DiskFormat() error {
-	tpmInterface, err := tpm.NewTPM()
-	if err != nil {
-		return err
-	}
-	defer tpmInterface.Close()
-
 	keystorePath, err := MountKeystore()
 	if err != nil {
 		return err
@@ -306,21 +223,13 @@ func DiskFormat() error {
 		return err
 	}
 
-	if !filepath.IsAbs(*diskCommandFormatDevice) {
-		return err
-	}
-
 	err = CryptsetupFormat(keystorePath+"/plain", *diskCommandFormatDevice)
 	if err != nil {
 		return err
 	}
 
-	sealed, err := tpmInterface.SealData(*diskCommandFormatLocality, *diskCommandFormatPcrs, randBytes, *diskCommandSrkPassword)
+	sealed, err := TPMInterface.SealData(*diskCommandFormatLocality, *diskCommandFormatPcrs, randBytes, *diskCommandSrkPassword)
 	if err != nil {
-		return err
-	}
-
-	if !filepath.IsAbs(*diskCommandFormatFile) {
 		return err
 	}
 
@@ -333,22 +242,8 @@ func DiskFormat() error {
 
 // DiskOpen opens a LUKS device
 func DiskOpen() error {
-	tpmInterface, err := tpm.NewTPM()
-	if err != nil {
-		return err
-	}
-	defer tpmInterface.Close()
-
 	keystorePath, err := MountKeystore()
 	if err != nil {
-		return err
-	}
-
-	if !filepath.IsAbs(*diskCommandOpenSealFile) {
-		return err
-	}
-
-	if !filepath.IsAbs(*diskCommandOpenDevice) {
 		return err
 	}
 
@@ -361,7 +256,7 @@ func DiskOpen() error {
 		return err
 	}
 
-	sealed, err := tpmInterface.UnsealData(sealedFile, *diskCommandSrkPassword)
+	sealed, err := TPMInterface.UnsealData(sealedFile, *diskCommandSrkPassword)
 	if err != nil {
 		return err
 	}
@@ -394,16 +289,6 @@ func DiskClose() error {
 
 // DiskExtend hashes and extends a LUKS header into a PCR
 func DiskExtend() error {
-	tpmInterface, err := tpm.NewTPM()
-	if err != nil {
-		return err
-	}
-	defer tpmInterface.Close()
-
-	if !filepath.IsAbs(*diskCommandExtendDevice) {
-		return err
-	}
-
 	deviceFD, err := os.Open(*diskCommandExtendDevice)
 	if err != nil {
 		return err
@@ -416,25 +301,5 @@ func DiskExtend() error {
 		return err
 	}
 
-	return tpmInterface.Measure(*diskCommandExtendPcr, luksHeader)
-}
-
-func resealData(locality byte, pcrInfo map[int][]byte, data []byte, srkPassword string) ([]byte, error) {
-	var srkAuth [20]byte
-	if srkPassword != "" {
-		srkAuth = sha1.Sum([]byte(srkPassword))
-	}
-
-	rwc, err := tpm.TPMOpener(tpm.TPMDevice)
-	if err != nil {
-		return nil, err
-	}
-	defer rwc.Close()
-
-	sealed, err := tspi.Reseal(rwc, locality, pcrInfo, data, srkAuth[:])
-	if err != nil {
-		return nil, err
-	}
-
-	return sealed, nil
+	return TPMInterface.Measure(*diskCommandExtendPcr, luksHeader)
 }

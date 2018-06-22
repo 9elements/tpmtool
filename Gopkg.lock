@@ -41,7 +41,7 @@
   branch = "master"
   name = "github.com/google/go-tpm"
   packages = ["tpm","tpmutil"]
-  revision = "07a4eb5af0651ac042a752af47b2bf7844f7f8c9"
+  revision = "180f7885cb387ab49323fbef6e042890f6e7d4fc"
 
 [[projects]]
   branch = "master"
@@ -71,7 +71,7 @@
   branch = "master"
   name = "github.com/systemboot/systemboot"
   packages = ["pkg/storage","pkg/tpm"]
-  revision = "d8e3c1e987eee7bdb01b33ee9a04b13bd95e6a43"
+  revision = "0b3658ee78ad6407a4a153e8526776f028b98dd4"
 
 [[projects]]
   name = "gopkg.in/alecthomas/kingpin.v2"
