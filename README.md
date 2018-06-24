@@ -43,7 +43,7 @@ TPM temporary deactivated: false
 
 # Dependencies
 
--   [Cryptsetup](https://gitlab.com/cryptsetup/cryptsetup) binary is required for the disk commands.
+-   [cryptsetup](https://gitlab.com/cryptsetup/cryptsetup) binary is required for the disk commands.
 
 # PCR pre-calculation
 
@@ -72,6 +72,9 @@ pcr1:
 pcr2:
   - method: static
     hash: c3018af653e2f1a16118dd8bab2f409fbc82aa9f
+pcr3:
+  - method: log
+    firmware: UEFI
 ```
 
 ## Calculation methods
