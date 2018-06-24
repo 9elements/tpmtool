@@ -52,7 +52,7 @@ PCR pre-calculation is an important feature to reseal credential in case of PCR 
 Usage:
 
 ```bash
-tpmtool crypt reseal --locality 0 sealing.yml credential.file
+tpmtool crypt reseal sealing.yml sealed-key.file
 ```
 
 Example sealing configuration:

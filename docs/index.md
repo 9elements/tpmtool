@@ -7,6 +7,7 @@ tpmtool is a tool for TPM interaction and disk encryption. It is written in pure
 -   Written in pure Go.
 -   TPM states are derived by Linux sysfs.
 -   Automatic TSS selection based on TPM version.
+-   TPM1 & TPM2 event log parser
 -   **Currently only TSPI for TPM specification 1.2 is available.**
 
 ## Core Features
@@ -36,9 +37,13 @@ TPM temporary deactivated: false
     -   Close device.
     -   Measure device luks header into a given PCR.
 
+# Package Availability
+
+[![Packaging status](https://repology.org/badge/vertical-allrepos/tpmtool.svg)](https://repology.org/metapackage/tpmtool)
+
 # Dependencies
 
--   [Cryptsetup](https://gitlab.com/cryptsetup/cryptsetup) binary is required for the disk commands.
+-   [cryptsetup](https://gitlab.com/cryptsetup/cryptsetup) binary is required for the disk commands.
 
 # PCR pre-calculation
 
@@ -47,7 +52,7 @@ PCR pre-calculation is an important feature to reseal credential in case of PCR 
 Usage:
 
 ```bash
-tpmtool crypt reseal --locality 0 sealing.yml credential.file
+tpmtool crypt reseal sealing.yml sealed-key.file
 ```
 
 Example sealing configuration:
@@ -67,6 +72,9 @@ pcr1:
 pcr2:
   - method: static
     hash: c3018af653e2f1a16118dd8bab2f409fbc82aa9f
+pcr3:
+  - method: log
+    firmware: UEFI
 ```
 
 ## Calculation methods
@@ -94,6 +102,14 @@ Extends a hash into the current PCR.
 **method:** extend
 
 **hashes:** [ 8dad1c80be028384f26b929b7e7e251fbe3c1d5, c3018af653e2f1a16118dd8bab2f409fbc82aa9f ] \(array type)
+
+### FimwareLog
+
+Uses the existing firmware log for PCR pre-calculation.
+
+**method:** log
+
+**firmware:** BIOS (enum type){UEFI, BIOS}
 
 ### Measure
 
