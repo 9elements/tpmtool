@@ -3,8 +3,10 @@ package main
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"log"
 	"os"
 	"os/exec"
+	"os/user"
 	"path"
 	"path/filepath"
 	"syscall"
@@ -22,6 +24,20 @@ const (
 	// DefaultDevMapperPath is the standard Linux device mapper path
 	DefaultDevMapperPath = "/dev/mapper/"
 )
+
+var (
+	// TmpfsFsOptions are secure fs options
+	TmpfsFsOptions string
+)
+
+func init() {
+	processUser, err := user.Current()
+	if err != nil {
+		log.Fatalln("Couldn't set Tpmfs keystore options")
+	}
+
+	TmpfsFsOptions = path.Join("rw,size=1M,nr_inodes=5k,noexec,nodev,nosuid,uid=", processUser.Uid, ",gid=", processUser.Gid, ",mode=1700")
+}
 
 // MountKeystore mounts the tmpfs key store
 func MountKeystore() (string, error) {

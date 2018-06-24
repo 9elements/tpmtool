@@ -5,6 +5,7 @@ type PreCalculation struct {
 	Method     CalculateType
 	Hash       string
 	DevicePath string
+	Firmware   FirmwareType
 	Hashes     []string
 	FilePaths  []string
 }

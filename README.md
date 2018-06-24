@@ -7,6 +7,7 @@ tpmtool is a tool for TPM interaction and disk encryption. It is written in pure
 -   Written in pure Go.
 -   TPM states are derived by Linux sysfs.
 -   Automatic TSS selection based on TPM version.
+-   TPM1 & TPM2 event log parser
 -   **Currently only TSPI for TPM specification 1.2 is available.**
 
 ## Core Features
@@ -98,6 +99,14 @@ Extends a hash into the current PCR.
 **method:** extend
 
 **hashes:** [ 8dad1c80be028384f26b929b7e7e251fbe3c1d5, c3018af653e2f1a16118dd8bab2f409fbc82aa9f ] \(array type)
+
+### FimwareLog
+
+Uses the existing firmware log for PCR pre-calculation.
+
+**method:** log
+
+**firmware:** BIOS (enum type){UEFI, BIOS}
 
 ### Measure
 

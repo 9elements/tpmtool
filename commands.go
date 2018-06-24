@@ -105,7 +105,7 @@ func CryptoSeal() error {
 		return err
 	}
 
-	if TPMInterface.Info().Specification == tpm.TPM12 && len(plainText) > tpm.TPM12MaxKeySize {
+	if TPMSpecVersion == tpm.TPM12 && len(plainText) > tpm.TPM12MaxKeySize {
 		return errors.New("Plain text file is too big, max 256 bytes")
 	}
 
@@ -213,6 +213,7 @@ func DiskFormat() error {
 	if err != nil {
 		return err
 	}
+	defer UnmountKeystore(keystorePath)
 
 	randBytes := make([]byte, 64)
 	if _, err = rand.Read(randBytes); err != nil {
@@ -223,8 +224,7 @@ func DiskFormat() error {
 		return err
 	}
 
-	err = CryptsetupFormat(keystorePath+"/plain", *diskCommandFormatDevice)
-	if err != nil {
+	if err = CryptsetupFormat(keystorePath+"/plain", *diskCommandFormatDevice); err != nil {
 		return err
 	}
 
@@ -233,11 +233,7 @@ func DiskFormat() error {
 		return err
 	}
 
-	if err = ioutil.WriteFile(*diskCommandFormatFile, sealed, 660); err != nil {
-		return err
-	}
-
-	return UnmountKeystore(keystorePath)
+	return ioutil.WriteFile(*diskCommandFormatFile, sealed, 660)
 }
 
 // DiskOpen opens a LUKS device
@@ -246,6 +242,7 @@ func DiskOpen() error {
 	if err != nil {
 		return err
 	}
+	defer UnmountKeystore(keystorePath)
 
 	if _, err = os.Stat(*diskCommandOpenMountPath); os.IsNotExist(err) {
 		return err
@@ -270,20 +267,19 @@ func DiskOpen() error {
 		return err
 	}
 
-	fmt.Printf("Sealed encrypted device mounted with name: %s\n", deviceName)
+	fmt.Printf("Sealed encrypted device opened with name: %s\n", deviceName)
 
-	return UnmountKeystore(keystorePath)
+	return nil
 }
 
 // DiskClose closes a LUKS device
 func DiskClose() error {
 	deviceMapperPath := path.Join("/dev/mapper/", *diskCommandCloseName)
 	mountpoint, err := storage.GetMountpointByDevice(deviceMapperPath)
-	if err != nil {
-		return err
+	if err == nil {
+		syscall.Unmount(*mountpoint, syscall.MNT_DETACH|syscall.MNT_FORCE)
 	}
 
-	syscall.Unmount(*mountpoint, syscall.MNT_DETACH|syscall.MNT_FORCE)
 	return CryptsetupClose(*diskCommandCloseName)
 }
 

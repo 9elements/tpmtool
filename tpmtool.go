@@ -24,6 +24,9 @@ var (
 	// TPMInterface is a global TPM interface
 	TPMInterface tpm.TPM
 
+	// TPMSpecVersion is the version of the TPM
+	TPMSpecVersion string
+
 	// CommandLine Arguments
 	status = kingpin.Command("status", "Show the TPM status information")
 
@@ -85,7 +88,7 @@ var (
 	diskCommandOpenMountPath = diskCommandOpen.Arg("mnt-path", "Mount path for mounting unsealed encrypted device").Required().String()
 
 	diskCommandClose     = diskCommand.Command("close", "Close cryptsetup partition")
-	diskCommandCloseName = diskCommandClose.Flag("device-name", "cryptsetup device name").Required().String()
+	diskCommandCloseName = diskCommandClose.Arg("device-name", "cryptsetup device name").Required().String()
 
 	diskCommandExtend       = diskCommand.Command("extend", "Extend luks header into a PCR")
 	diskCommandExtendDevice = diskCommandExtend.Arg("device", "Device which should be encrypted").Required().String()
@@ -112,6 +115,8 @@ func main() {
 		log.Fatal("Can't open TPM interface: " + err.Error())
 	}
 	defer TPMInterface.Close()
+
+	TPMSpecVersion = TPMInterface.Info().Specification
 
 	switch kingpin.Parse() {
 	case "status":
