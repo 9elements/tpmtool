@@ -1,4 +1,4 @@
-package main
+package tpmtool
 
 // CalculateType defines the calculation action for the PCR
 type CalculateType string

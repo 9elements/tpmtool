@@ -12,6 +12,7 @@ import (
 
 	"github.com/systemboot/systemboot/pkg/storage"
 	"github.com/systemboot/systemboot/pkg/tpm"
+	"github.com/systemboot/tpmtool/pkg/tpmtool"
 )
 
 const (
@@ -94,12 +95,6 @@ func OwnerResetLock() error {
 
 // CryptoSeal seals data aganst PCR with TPM
 func CryptoSeal() error {
-	for _, pcr := range *cryptoCommandSealPcrs {
-		if pcr >= MaxPlatformConfigurationRegister || pcr < 0 {
-			return errors.New("PCR index is incorrect")
-		}
-	}
-
 	plainText, err := ioutil.ReadFile(*cryptoCommandSealPlainFile)
 	if err != nil {
 		return err
@@ -109,7 +104,12 @@ func CryptoSeal() error {
 		return errors.New("Plain text file is too big, max 256 bytes")
 	}
 
-	sealed, err := TPMInterface.SealData(*cryptoCommandSealLocality, *cryptoCommandSealPcrs, plainText, *cryptoCommandSrkPassword)
+	pcrInfo, err := PreCalculate(*cryptoCommandSealConfig)
+	if err != nil {
+		return err
+	}
+
+	sealed, err := TPMInterface.ResealData(*cryptoCommandSealLocality, pcrInfo, plainText, *cryptoCommandSrkPassword)
 	if err != nil {
 		return err
 	}
@@ -209,11 +209,11 @@ func PcrMeasure() error {
 
 // DiskFormat formats a device for luks setup.
 func DiskFormat() error {
-	keystorePath, err := MountKeystore()
+	keystorePath, err := tpmtool.MountKeystore()
 	if err != nil {
 		return err
 	}
-	defer UnmountKeystore(keystorePath)
+	defer tpmtool.UnmountKeystore(keystorePath)
 
 	randBytes := make([]byte, 64)
 	if _, err = rand.Read(randBytes); err != nil {
@@ -224,11 +224,16 @@ func DiskFormat() error {
 		return err
 	}
 
-	if err = CryptsetupFormat(keystorePath+"/plain", *diskCommandFormatDevice); err != nil {
+	if err = tpmtool.CryptsetupFormat(keystorePath+"/plain", *diskCommandFormatDevice); err != nil {
 		return err
 	}
 
-	sealed, err := TPMInterface.SealData(*diskCommandFormatLocality, *diskCommandFormatPcrs, randBytes, *diskCommandSrkPassword)
+	pcrInfo, err := PreCalculate(*diskCommandFormatConfig)
+	if err != nil {
+		return err
+	}
+
+	sealed, err := TPMInterface.ResealData(*diskCommandFormatLocality, pcrInfo, randBytes, *diskCommandSrkPassword)
 	if err != nil {
 		return err
 	}
@@ -238,11 +243,11 @@ func DiskFormat() error {
 
 // DiskOpen opens a LUKS device
 func DiskOpen() error {
-	keystorePath, err := MountKeystore()
+	keystorePath, err := tpmtool.MountKeystore()
 	if err != nil {
 		return err
 	}
-	defer UnmountKeystore(keystorePath)
+	defer tpmtool.UnmountKeystore(keystorePath)
 
 	if _, err = os.Stat(*diskCommandOpenMountPath); os.IsNotExist(err) {
 		return err
@@ -262,7 +267,7 @@ func DiskOpen() error {
 		return err
 	}
 
-	deviceName, err := CryptsetupOpen(keystorePath+"/plain", *diskCommandOpenDevice)
+	deviceName, err := tpmtool.CryptsetupOpen(keystorePath+"/plain", *diskCommandOpenDevice)
 	if err != nil {
 		return err
 	}
@@ -274,13 +279,13 @@ func DiskOpen() error {
 
 // DiskClose closes a LUKS device
 func DiskClose() error {
-	deviceMapperPath := path.Join("/dev/mapper/", *diskCommandCloseName)
+	deviceMapperPath := path.Join(tpmtool.DefaultDevMapperPath, *diskCommandCloseName)
 	mountpoint, err := storage.GetMountpointByDevice(deviceMapperPath)
 	if err == nil {
 		syscall.Unmount(*mountpoint, syscall.MNT_DETACH|syscall.MNT_FORCE)
 	}
 
-	return CryptsetupClose(*diskCommandCloseName)
+	return tpmtool.CryptsetupClose(*diskCommandCloseName)
 }
 
 // DiskExtend hashes and extends a LUKS header into a PCR

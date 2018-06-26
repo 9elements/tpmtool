@@ -50,7 +50,7 @@ var (
 	cryptoCommandSealCipherFile = cryptoCommandSeal.Arg("sealed-file", "Encrypted data file path").Required().String()
 
 	cryptoCommandSeal         = cryptoCommand.Command("seal", "Seal data against the TPM")
-	cryptoCommandSealPcrs     = cryptoCommandSeal.Flag("pcr", "Set the PCRS for the sealing operation").Required().Ints()
+	cryptoCommandSealConfig   = cryptoCommandSeal.Arg("config", "Sealing configuration for PCR pre-calculation").Required().String()
 	cryptoCommandSealLocality = cryptoCommandSeal.Flag("locality", "Sets the locality for the sealing operation").Uint8()
 
 	cryptoCommandUnseal           = cryptoCommand.Command("unseal", "Unseal data against the TPM")
@@ -79,7 +79,7 @@ var (
 	diskCommandFormat         = diskCommand.Command("format", "Format cryptsetup partition with sealing")
 	diskCommandFormatFile     = diskCommandFormat.Arg("sealed-key-file", "Sealed encrypted key").Required().String()
 	diskCommandFormatDevice   = diskCommandFormat.Arg("device", "A device which should be encrypted").Required().String()
-	diskCommandFormatPcrs     = diskCommandFormat.Flag("pcr", "Set the PCRS for the sealing operation").Required().Ints()
+	diskCommandFormatConfig   = diskCommandFormat.Arg("config", "Sealing configuration for PCR pre-calculation").Required().String()
 	diskCommandFormatLocality = diskCommandFormat.Flag("locality", "Sets the locality for the sealing operation").Uint8()
 
 	diskCommandOpen          = diskCommand.Command("open", "Open cryptsetup partition with sealed key")
@@ -121,63 +121,63 @@ func main() {
 	switch kingpin.Parse() {
 	case "status":
 		if err := Status(); err != nil {
-			log.Panic(err.Error())
+			log.Fatalln(err.Error())
 		}
 	case "ek":
 		if err := Ek(); err != nil {
-			log.Panic(err.Error())
+			log.Fatalln(err.Error())
 		}
 	case "owner take":
 		if err := OwnerTake(); err != nil {
-			log.Panic(err.Error())
+			log.Fatalln(err.Error())
 		}
 	case "owner clear":
 		if err := OwnerClear(); err != nil {
-			log.Panic(err.Error())
+			log.Fatalln(err.Error())
 		}
 	case "owner reset-lock":
 		if err := OwnerResetLock(); err != nil {
-			log.Panic(err.Error())
+			log.Fatalln(err.Error())
 		}
 	case "crypto seal":
 		if err := CryptoSeal(); err != nil {
-			log.Panic(err.Error())
+			log.Fatalln(err.Error())
 		}
 	case "crypto unseal":
 		if err := CryptoUnseal(); err != nil {
-			log.Panic(err.Error())
+			log.Fatalln(err.Error())
 		}
 	case "crypto reseal":
 		if err := CryptoReseal(); err != nil {
-			log.Panic(err.Error())
+			log.Fatalln(err.Error())
 		}
 	case "pcr list":
 		if err := PcrList(); err != nil {
-			log.Panic(err.Error())
+			log.Fatalln(err.Error())
 		}
 	case "pcr read":
 		if err := PcrRead(); err != nil {
-			log.Panic(err.Error())
+			log.Fatalln(err.Error())
 		}
 	case "pcr measure":
 		if err := PcrMeasure(); err != nil {
-			log.Panic(err.Error())
+			log.Fatalln(err.Error())
 		}
 	case "disk format":
 		if err := DiskFormat(); err != nil {
-			log.Panic(err.Error())
+			log.Fatalln(err.Error())
 		}
 	case "disk open":
 		if err := DiskOpen(); err != nil {
-			log.Panic(err.Error())
+			log.Fatalln(err.Error())
 		}
 	case "disk close":
 		if err := DiskClose(); err != nil {
-			log.Panic(err.Error())
+			log.Fatalln(err.Error())
 		}
 	case "disk extend":
 		if err := DiskExtend(); err != nil {
-			log.Panic(err.Error())
+			log.Fatalln(err.Error())
 		}
 	default:
 		log.Fatal("Command not found")
