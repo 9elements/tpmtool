@@ -1,4 +1,4 @@
-package main
+package tpmtool
 
 import (
 	"crypto/rand"
@@ -19,8 +19,8 @@ const (
 	DefaultFormatParams = "-c aes-xts-essiv:sha256 -s 512 -y --use-random -q"
 	// DefaultKeyPath is the tmpfs directory for storing keys
 	DefaultKeyPath = "/tmp/tpmtool"
-	// TpmfsFsName is the linux tpmfs fs name
-	TpmfsFsName = "tmpfs"
+	// TmpfsFsName is the linux tpmfs fs name
+	TmpfsFsName = "tmpfs"
 	// DefaultDevMapperPath is the standard Linux device mapper path
 	DefaultDevMapperPath = "/dev/mapper/"
 )
@@ -54,7 +54,7 @@ func MountKeystore() (string, error) {
 		return "", err
 	}
 
-	if err := syscall.Mount(TpmfsFsName, target, TpmfsFsName, uintptr(flags), data); err != nil {
+	if err := syscall.Mount(TmpfsFsName, target, TmpfsFsName, uintptr(flags), data); err != nil {
 		return "", err
 	}
 

@@ -1,4 +1,4 @@
-package main
+package tpmtool
 
 import (
 	"testing"
@@ -10,7 +10,6 @@ import (
 var testConfig = multiconfig.NewWithPath("tests/sealing.yaml")
 
 func TestConfigUnmarshal(t *testing.T) {
-	CurrentPCRMap = TPM1DefaultPCRMap
 	sealingConf := new(TPM1SealingConfig)
 
 	err := testConfig.Load(sealingConf)

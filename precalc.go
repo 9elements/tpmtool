@@ -10,6 +10,7 @@ import (
 
 	"github.com/koding/multiconfig"
 	"github.com/systemboot/systemboot/pkg/tpm"
+	"github.com/systemboot/tpmtool/pkg/tpmtool"
 )
 
 // CurrentPCRMap is the current used PCR map and a copy of the default map
@@ -52,21 +53,21 @@ func getMap() map[int][]byte {
 	return nil
 }
 
-func hashSum(data []byte, algoID TPMIAlgHash) ([]byte, error) {
+func hashSum(data []byte, algoID tpmtool.TPMIAlgHash) ([]byte, error) {
 	switch algoID {
-	case TPMAlgSha:
+	case tpmtool.TPMAlgSha:
 		hash := sha1.Sum(data)
 		return hash[:], nil
-	case TPMAlgSha256:
+	case tpmtool.TPMAlgSha256:
 		hash := sha256.Sum256(data)
 		return hash[:], nil
-	case TPMAlgSha384:
+	case tpmtool.TPMAlgSha384:
 		hash := sha512.Sum384(data)
 		return hash[:], nil
-	case TPMAlgSha512:
+	case tpmtool.TPMAlgSha512:
 		hash := sha512.Sum512(data)
 		return hash[:], nil
-	case TPMAlgSm3s256:
+	case tpmtool.TPMAlgSm3s256:
 		return nil, errors.New("Not implemented yet")
 	}
 
@@ -90,7 +91,7 @@ func DynamicPCR(pcrIndex int) error {
 }
 
 // ExtendPCR extends a hash into a current PCR
-func ExtendPCR(pcrIndex int, hash []byte, algoID TPMIAlgHash) error {
+func ExtendPCR(pcrIndex int, hash []byte, algoID tpmtool.TPMIAlgHash) error {
 	hash, err := hashSum(append(CurrentPCRMap[pcrIndex], hash...), algoID)
 	if err != nil {
 		return err
@@ -101,7 +102,7 @@ func ExtendPCR(pcrIndex int, hash []byte, algoID TPMIAlgHash) error {
 }
 
 // MeasurePCR measures a file into a PCR
-func MeasurePCR(pcrIndex int, filePath string, algoID TPMIAlgHash) error {
+func MeasurePCR(pcrIndex int, filePath string, algoID tpmtool.TPMIAlgHash) error {
 	file, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return err
@@ -123,17 +124,17 @@ func MeasurePCR(pcrIndex int, filePath string, algoID TPMIAlgHash) error {
 }
 
 // FirmwareLogPCR uses the firmware ACPI log for extending PCRs
-func FirmwareLogPCR(pcrIndex int, firmware FirmwareType) error {
-	tcpaLog, err := ParseLog(firmware)
+func FirmwareLogPCR(pcrIndex int, firmware tpmtool.FirmwareType) error {
+	tcpaLog, err := tpmtool.ParseLog(firmware, TPMSpecVersion)
 	if err != nil {
 		return err
 	}
 
-	for _, event := range tcpaLog.pcrList {
-		if event.pcrIndex == pcrIndex {
-			for _, digest := range event.digests {
-				if event.pcrIndex == pcrIndex {
-					err := ExtendPCR(event.pcrIndex, digest.digest, digest.digestAlg)
+	for _, event := range tcpaLog.PcrList {
+		if event.PcrIndex == pcrIndex {
+			for _, digest := range event.Digests {
+				if event.PcrIndex == pcrIndex {
+					err := ExtendPCR(event.PcrIndex, digest.Digest, digest.DigestAlg)
 					if err != nil {
 						return err
 					}
@@ -146,7 +147,7 @@ func FirmwareLogPCR(pcrIndex int, firmware FirmwareType) error {
 }
 
 // LuksPCR extends the hash of a LUKS device into a current PCR
-func LuksPCR(pcrIndex int, devicePath string, algoID TPMIAlgHash) error {
+func LuksPCR(pcrIndex int, devicePath string, algoID tpmtool.TPMIAlgHash) error {
 	deviceFD, err := os.Open(devicePath)
 	if err != nil {
 		return err
@@ -168,35 +169,35 @@ func LuksPCR(pcrIndex int, devicePath string, algoID TPMIAlgHash) error {
 	return nil
 }
 
-func runCalculations(calculations []PreCalculation, pcrIndex int) error {
+func runCalculations(calculations []tpmtool.PreCalculation, pcrIndex int) error {
 	for _, calculation := range calculations {
-		if calculation.Method == Static && len(calculations) > 1 {
+		if calculation.Method == tpmtool.Static && len(calculations) > 1 {
 			return errors.New("Static type: More calculation defined than possible")
 		}
 
-		if calculation.Method == Dynamic && len(calculations) > 1 {
+		if calculation.Method == tpmtool.Dynamic && len(calculations) > 1 {
 			return errors.New("Dynamic type: More calculation defined than possible")
 		}
 	}
 
 	// For TPM 2.0 we need to get Algo per PCR bank
-	var algoID = TPMAlgError
+	var algoID = tpmtool.TPMAlgError
 	if TPMSpecVersion == tpm.TPM12 {
-		algoID = TPMAlgSha
+		algoID = tpmtool.TPMAlgSha
 	}
 
 	CurrentPCRMap[pcrIndex] = getMap()[pcrIndex]
 	for _, calculation := range calculations {
 		switch calculation.Method {
-		case Static:
+		case tpmtool.Static:
 			hash := calculation.Hash
 			if hash == "" {
 				return errors.New("Static type: No hash defined")
 			}
 			StaticPCR(pcrIndex, []byte(hash))
-		case Dynamic:
+		case tpmtool.Dynamic:
 			return DynamicPCR(pcrIndex)
-		case Extend:
+		case tpmtool.Extend:
 			if len(calculation.Hashes) <= 0 {
 				return errors.New("Extend type: No hashes defined")
 			}
@@ -205,7 +206,7 @@ func runCalculations(calculations []PreCalculation, pcrIndex int) error {
 					return err
 				}
 			}
-		case Measure:
+		case tpmtool.Measure:
 			if len(calculation.FilePaths) <= 0 {
 				return errors.New("Measure type: No paths defined")
 			}
@@ -214,14 +215,14 @@ func runCalculations(calculations []PreCalculation, pcrIndex int) error {
 					return err
 				}
 			}
-		case FirmwareLog:
+		case tpmtool.FirmwareLog:
 			if calculation.Firmware == "" {
 				return errors.New("FirmwareLog type: Firmware not set")
 			}
 			if err := FirmwareLogPCR(pcrIndex, calculation.Firmware); err != nil {
 				return err
 			}
-		case Luks:
+		case tpmtool.Luks:
 			if calculation.DevicePath == "" {
 				return errors.New("Luks type: No path defined")
 			}
@@ -234,7 +235,7 @@ func runCalculations(calculations []PreCalculation, pcrIndex int) error {
 	return nil
 }
 
-func executeConfig(sealingConfig *TPM1SealingConfig) error {
+func executeConfig(sealingConfig *tpmtool.TPM1SealingConfig) error {
 	if sealingConfig.Pcr0 != nil {
 		if err := runCalculations(sealingConfig.Pcr0, 0); err != nil {
 			return err
@@ -386,10 +387,10 @@ func executeConfig(sealingConfig *TPM1SealingConfig) error {
 // doing different types of calculations in the right order
 func PreCalculate(sealingConfigPath string) (map[int][]byte, error) {
 	// Initialize the default values
-	var sealingConf *TPM1SealingConfig
+	var sealingConf *tpmtool.TPM1SealingConfig
 	CurrentPCRMap = make(map[int][]byte)
 	if TPMSpecVersion == tpm.TPM12 {
-		sealingConf = new(TPM1SealingConfig)
+		sealingConf = new(tpmtool.TPM1SealingConfig)
 	} else {
 		return nil, errors.New("TPM spec not implemented yet")
 	}
