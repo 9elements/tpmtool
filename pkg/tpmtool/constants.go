@@ -178,6 +178,8 @@ const (
 	EvEFIPlatformFirmwareBlob EFILogID = 0x80000008
 	// EvEFIHandoffTables see [1] specification in tcpa_log.go
 	EvEFIHandoffTables EFILogID = 0x80000009
+	// EvEFIHCRTMEvent see [1] specification in tcpa_log.go
+	EvEFIHCRTMEvent EFILogID = 0x80000010
 	// EvEFIVariableAuthority see [1] specification in tcpa_log.go
 	EvEFIVariableAuthority EFILogID = 0x800000E0
 )
@@ -194,6 +196,7 @@ var EFILogTypes = map[EFILogID]string{
 	EvEFIAction:                  "EV_EFI_ACTION",
 	EvEFIPlatformFirmwareBlob:    "EV_EFI_PLATFORM_FIRMWARE_BLOB",
 	EvEFIHandoffTables:           "EV_EFI_HANDOFF_TABLES",
+	EvEFIHCRTMEvent:              "EV_EFI_HCRTM_EVENT",
 	EvEFIVariableAuthority:       "EV_EFI_VARIABLE_AUTHORITY",
 }
 
@@ -202,3 +205,6 @@ const TCGAgileEventFormatID string = "Spec ID Event03"
 
 // TCGOldEfiFormatID is the legacy eventlog identifier for EV_NO_ACTION events
 const TCGOldEfiFormatID string = "Spec ID Event02"
+
+// HCRTM string for event type EV_EFI_HCRTM_EVENT
+const HCRTM string = "HCRTM"

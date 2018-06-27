@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"os"
+	"unicode/utf16"
 
 	"github.com/systemboot/systemboot/pkg/tpm"
 )
@@ -37,90 +39,295 @@ var HashAlgoToSize = map[TPMIAlgHash]TPMIAlgHashSize{
 	TPMAlgSm3s256: TPMAlgSm3s256Size,
 }
 
-// TPMIHA is a TPM2 structure
-type TPMIHA struct {
-	hash []byte
+func stripControlSequences(str string) string {
+	b := make([]byte, len(str))
+	var bl int
+	for i := 0; i < len(str); i++ {
+		c := str[i]
+		if c >= 32 && c < 127 {
+			b[bl] = c
+			bl++
+		}
+	}
+	return string(b[:bl])
 }
 
-// TPMTHA is a TPM2 structure
-type TPMTHA struct {
-	hashAlg TPMIAlgHash
-	digest  TPMIHA
+func getTaggedEvent(eventData []byte) (*string, error) {
+	var eventReader = bytes.NewReader(eventData)
+	var taggedEvent TCGPCClientTaggedEvent
+
+	if err := binary.Read(eventReader, binary.LittleEndian, &taggedEvent.taggedEventID); err != nil {
+		return nil, err
+	}
+
+	if err := binary.Read(eventReader, binary.LittleEndian, &taggedEvent.taggedEventDataSize); err != nil {
+		return nil, err
+	}
+
+	taggedEvent.taggedEventData = make([]byte, taggedEvent.taggedEventDataSize)
+	if err := binary.Read(eventReader, binary.LittleEndian, &taggedEvent.taggedEventData); err != nil {
+		return nil, err
+	}
+
+	eventInfo := fmt.Sprintf("Tag ID - %d - %s", taggedEvent.taggedEventID, string(taggedEvent.taggedEventData))
+	return &eventInfo, nil
 }
 
-// TPMLDigestValues is a TPM2 structure
-type TPMLDigestValues struct {
-	count   uint32
-	digests []TPMTHA
+func getHandoffTablePointers(eventData []byte) (*string, error) {
+	var eventReader = bytes.NewReader(eventData)
+	var handoffTablePointers EFIHandoffTablePointers
+
+	if err := binary.Read(eventReader, binary.LittleEndian, &handoffTablePointers.numberOfTables); err != nil {
+		return nil, err
+	}
+
+	handoffTablePointers.tableEntry = make([]EFIConfigurationTable, handoffTablePointers.numberOfTables)
+	for i := uint64(0); i < handoffTablePointers.numberOfTables; i++ {
+		if err := binary.Read(eventReader, binary.LittleEndian, &handoffTablePointers.tableEntry[i].vendorGUID.blockA); err != nil {
+			return nil, err
+		}
+
+		if err := binary.Read(eventReader, binary.LittleEndian, &handoffTablePointers.tableEntry[i].vendorGUID.blockB); err != nil {
+			return nil, err
+		}
+
+		if err := binary.Read(eventReader, binary.LittleEndian, &handoffTablePointers.tableEntry[i].vendorGUID.blockC); err != nil {
+			return nil, err
+		}
+
+		if err := binary.Read(eventReader, binary.LittleEndian, &handoffTablePointers.tableEntry[i].vendorGUID.blockD); err != nil {
+			return nil, err
+		}
+
+		if err := binary.Read(eventReader, binary.LittleEndian, &handoffTablePointers.tableEntry[i].vendorGUID.blockE); err != nil {
+			return nil, err
+		}
+
+		if err := binary.Read(eventReader, binary.LittleEndian, &handoffTablePointers.tableEntry[i].vendorTable); err != nil {
+			return nil, err
+		}
+	}
+
+	eventInfo := fmt.Sprint("Tables: ")
+	for _, table := range handoffTablePointers.tableEntry {
+		guid := fmt.Sprintf("%x-%x-%x-%x-%x", table.vendorGUID.blockA, table.vendorGUID.blockB, table.vendorGUID.blockC, table.vendorGUID.blockD, table.vendorGUID.blockE)
+		eventInfo += fmt.Sprintf("At address 0x%d with Guid %s", table.vendorTable, guid)
+	}
+	return &eventInfo, nil
 }
 
-// TcgEfiSpecIDEventAlgorithmSize is a TPM2 structure
-type TcgEfiSpecIDEventAlgorithmSize struct {
-	algorithID uint16
-	digestSize uint16
+func getPlatformFirmwareBlob(eventData []byte) (*string, error) {
+	var eventReader = bytes.NewReader(eventData)
+	var platformFirmwareBlob EFIPlatformFirmwareBlob
+
+	if err := binary.Read(eventReader, binary.LittleEndian, &platformFirmwareBlob.blobBase); err != nil {
+		return nil, err
+	}
+
+	if err := binary.Read(eventReader, binary.LittleEndian, &platformFirmwareBlob.blobLength); err != nil {
+		return nil, err
+	}
+
+	eventInfo := fmt.Sprintf("Blob address - 0x%d - with size - %db", platformFirmwareBlob.blobBase, platformFirmwareBlob.blobLength)
+	return &eventInfo, nil
 }
 
-// TcgEfiSpecIDEvent is a TPM2 structure
-type TcgEfiSpecIDEvent struct {
-	signature          [16]byte
-	platformClass      uint32
-	specVersionMinor   uint8
-	specVersionMajor   uint8
-	specErrata         uint8
-	uintnSize          uint8
-	numberOfAlgorithms uint32
-	digestSizes        []TcgEfiSpecIDEventAlgorithmSize
-	vendorInfoSize     uint8
-	vendorInfo         []byte
+func getGPTEventString(eventData []byte) (*string, error) {
+	var eventReader = bytes.NewReader(eventData)
+	var gptEvent EFIGptData
+
+	if err := binary.Read(eventReader, binary.LittleEndian, &gptEvent.uefiPartitionHeader.Signature); err != nil {
+		return nil, err
+	}
+
+	if err := binary.Read(eventReader, binary.LittleEndian, &gptEvent.uefiPartitionHeader.Revision); err != nil {
+		return nil, err
+	}
+
+	if err := binary.Read(eventReader, binary.LittleEndian, &gptEvent.uefiPartitionHeader.Size); err != nil {
+		return nil, err
+	}
+
+	if err := binary.Read(eventReader, binary.LittleEndian, &gptEvent.uefiPartitionHeader.CRC); err != nil {
+		return nil, err
+	}
+
+	if err := binary.Read(eventReader, binary.LittleEndian, &gptEvent.uefiPartitionHeader.HeaderStartLBA); err != nil {
+		return nil, err
+	}
+
+	if err := binary.Read(eventReader, binary.LittleEndian, &gptEvent.uefiPartitionHeader.HeaderCopyStartLBA); err != nil {
+		return nil, err
+	}
+
+	if err := binary.Read(eventReader, binary.LittleEndian, &gptEvent.uefiPartitionHeader.FirstUsableLBA); err != nil {
+		return nil, err
+	}
+
+	if err := binary.Read(eventReader, binary.LittleEndian, &gptEvent.uefiPartitionHeader.LastUsableLBA); err != nil {
+		return nil, err
+	}
+
+	if err := binary.Read(eventReader, binary.LittleEndian, &gptEvent.uefiPartitionHeader.DiskGUID); err != nil {
+		return nil, err
+	}
+
+	// Stop here we only want to know which device was used here.
+
+	eventInfo := fmt.Sprint("Disk Guid - ")
+	eventInfo += gptEvent.uefiPartitionHeader.DiskGUID.String()
+	return &eventInfo, nil
 }
 
-// TcgBiosSpecIDEvent is a TPM2 structure
-type TcgBiosSpecIDEvent struct {
-	signature        [16]byte
-	platformClass    uint32
-	specVersionMinor uint8
-	specVersionMajor uint8
-	specErrata       uint8
-	uintnSize        uint8
-	vendorInfoSize   uint8
-	vendorInfo       []byte
+func getImageLoadEventString(eventData []byte) (*string, error) {
+	var eventReader = bytes.NewReader(eventData)
+	var imageLoadEvent EFIImageLoadEvent
+
+	if err := binary.Read(eventReader, binary.LittleEndian, &imageLoadEvent.imageLocationInMemory); err != nil {
+		return nil, err
+	}
+
+	if err := binary.Read(eventReader, binary.LittleEndian, &imageLoadEvent.imageLengthInMemory); err != nil {
+		return nil, err
+	}
+
+	if err := binary.Read(eventReader, binary.LittleEndian, &imageLoadEvent.imageLinkTimeAddress); err != nil {
+		return nil, err
+	}
+
+	if err := binary.Read(eventReader, binary.LittleEndian, &imageLoadEvent.lengthOfDevicePath); err != nil {
+		return nil, err
+	}
+
+	// Stop here we only want to know which device was used here.
+
+	eventInfo := fmt.Sprintf("Image loaded at address 0x%d ", imageLoadEvent.imageLocationInMemory)
+	eventInfo += fmt.Sprintf("with %db", imageLoadEvent.imageLengthInMemory)
+
+	return &eventInfo, nil
 }
 
-// TcgPcrEvent2 is a TPM2 default log structure (EFI only)
-type TcgPcrEvent2 struct {
-	pcrIndex  uint32
-	eventType uint32
-	digests   TPMLDigestValues
-	eventSize uint32
-	event     TcgEfiSpecIDEvent
+func getVariableDataString(eventData []byte) (*string, error) {
+	var eventReader = bytes.NewReader(eventData)
+	var variableData EFIVariableData
+
+	if err := binary.Read(eventReader, binary.LittleEndian, &variableData.variableName.blockA); err != nil {
+		return nil, err
+	}
+
+	if err := binary.Read(eventReader, binary.LittleEndian, &variableData.variableName.blockB); err != nil {
+		return nil, err
+	}
+
+	if err := binary.Read(eventReader, binary.LittleEndian, &variableData.variableName.blockC); err != nil {
+		return nil, err
+	}
+
+	if err := binary.Read(eventReader, binary.LittleEndian, &variableData.variableName.blockD); err != nil {
+		return nil, err
+	}
+
+	if err := binary.Read(eventReader, binary.LittleEndian, &variableData.variableName.blockE); err != nil {
+		return nil, err
+	}
+
+	if err := binary.Read(eventReader, binary.LittleEndian, &variableData.unicodeNameLength); err != nil {
+		return nil, err
+	}
+
+	if err := binary.Read(eventReader, binary.LittleEndian, &variableData.variableDataLength); err != nil {
+		return nil, err
+	}
+
+	variableData.unicodeName = make([]uint16, variableData.unicodeNameLength)
+	if err := binary.Read(eventReader, binary.LittleEndian, &variableData.unicodeName); err != nil {
+		return nil, err
+	}
+
+	variableData.variableData = make([]byte, variableData.variableDataLength)
+	if err := binary.Read(eventReader, binary.LittleEndian, &variableData.variableData); err != nil {
+		return nil, err
+	}
+
+	guid := fmt.Sprintf("Variable - %x-%x-%x-%x-%x - ", variableData.variableName.blockA, variableData.variableName.blockB, variableData.variableName.blockC, variableData.variableName.blockD, variableData.variableName.blockE)
+	eventInfo := guid
+	utf16String := utf16.Decode(variableData.unicodeName)
+	eventInfo += fmt.Sprintf("%s", string(utf16String))
+
+	return &eventInfo, nil
 }
 
-// TcgPcrEvent is the TPM1.2 default log structure (BIOS, EFI compatible)
-type TcgPcrEvent struct {
-	pcrIndex  uint32
-	eventType uint32
-	digest    [20]byte
-	eventSize uint32
-	event     TcgBiosSpecIDEvent
-}
+func getEventDataString(eventType uint32, eventData []byte) (*string, error) {
+	if eventType < uint32(EvEFIEventBase) {
+		switch BIOSLogID(eventType) {
+		case EvSeparator:
+			eventInfo := fmt.Sprintf("%x", eventData)
+			return &eventInfo, nil
+		case EvAction:
+			eventInfo := string(bytes.Trim(eventData, "\x00"))
+			return &eventInfo, nil
+		case EvOmitBootDeviceEvents:
+			eventInfo := string("BOOT ATTEMPTS OMITTED")
+			return &eventInfo, nil
+		case EvPostCode:
+			eventInfo := string(bytes.Trim(eventData, "\x00"))
+			return &eventInfo, nil
+		case EvEventTag:
+			eventInfo, err := getTaggedEvent(eventData)
+			if err != nil {
+				return nil, err
+			}
+			return eventInfo, nil
+		case EvSCRTMContents:
+			eventInfo := string(bytes.Trim(eventData, "\x00"))
+			return &eventInfo, nil
+		case EvIPL:
+			eventInfo := string(bytes.Trim(eventData, "\x00"))
+			return &eventInfo, nil
+		}
+	} else {
+		switch EFILogID(eventType) {
+		case EvEFIHCRTMEvent:
+			eventInfo := "HCRTM"
+			return &eventInfo, nil
+		case EvEFIAction:
+			eventInfo := string(bytes.Trim(eventData, "\x00"))
+			return &eventInfo, nil
+		case EvEFIVariableDriverConfig, EvEFIVariableBoot, EvEFIVariableAuthority:
+			eventInfo, err := getVariableDataString(eventData)
+			if err != nil {
+				return nil, err
+			}
+			return eventInfo, nil
+		case EvEFIRuntimeServicesDriver, EvEFIBootServicesDriver, EvEFIBootServicesApplication:
+			eventInfo, err := getImageLoadEventString(eventData)
+			if err != nil {
+				return nil, err
+			}
+			return eventInfo, nil
+		case EvEFIGPTEvent:
+			eventInfo, err := getGPTEventString(eventData)
+			if err != nil {
+				return nil, err
+			}
+			return eventInfo, nil
+		case EvEFIPlatformFirmwareBlob:
+			eventInfo, err := getPlatformFirmwareBlob(eventData)
+			if err != nil {
+				return nil, err
+			}
+			return eventInfo, nil
+		case EvEFIHandoffTables:
+			eventInfo, err := getHandoffTablePointers(eventData)
+			if err != nil {
+				return nil, err
+			}
+			return eventInfo, nil
+		}
+	}
 
-// PCRDigestValue is the hash and algorithm
-type PCRDigestValue struct {
-	DigestAlg TPMIAlgHash
-	Digest    []byte
-}
-
-// PCRDigestInfo is the info about the measurements
-type PCRDigestInfo struct {
-	PcrIndex     int
-	PcrEventName string
-	Digests      []PCRDigestValue
-}
-
-// PCRLog is a generic PCR eventlog structure
-type PCRLog struct {
-	Firmware FirmwareType
-	PcrList  []PCRDigestInfo
+	eventInfo := string(bytes.Trim(eventData, "\x00"))
+	return &eventInfo, errors.New("Event type couldn't get parsed")
 }
 
 func readTPM2Log(firmware FirmwareType) (*PCRLog, error) {
@@ -148,6 +355,7 @@ func readTPM2Log(firmware FirmwareType) (*PCRLog, error) {
 		}
 
 		if BIOSLogID(pcrEvent.eventType) == EvNoAction {
+			var efiSpecEvent TcgEfiSpecIDEvent
 			if err := binary.Read(file, endianess, make([]byte, TPMAlgShaSize)); err == io.EOF {
 				break
 			} else if err != nil {
@@ -159,80 +367,85 @@ func readTPM2Log(firmware FirmwareType) (*PCRLog, error) {
 			} else if err != nil {
 				return nil, err
 			}
+			pcrEvent.event = make([]byte, pcrEvent.eventSize)
 
-			if err := binary.Read(file, endianess, &pcrEvent.event.signature); err == io.EOF {
+			if err := binary.Read(file, endianess, &efiSpecEvent.signature); err == io.EOF {
 				break
 			} else if err != nil {
 				return nil, err
 			}
 
-			identifier := string(bytes.Trim(pcrEvent.event.signature[:], "\x00"))
+			identifier := string(bytes.Trim(efiSpecEvent.signature[:], "\x00"))
 			if string(identifier) != TCGAgileEventFormatID {
 				continue
 			}
 
-			if err := binary.Read(file, endianess, &pcrEvent.event.platformClass); err == io.EOF {
+			if err := binary.Read(file, endianess, &efiSpecEvent.platformClass); err == io.EOF {
 				break
 			} else if err != nil {
 				return nil, err
 			}
 
-			if err := binary.Read(file, endianess, &pcrEvent.event.specVersionMinor); err == io.EOF {
+			if err := binary.Read(file, endianess, &efiSpecEvent.specVersionMinor); err == io.EOF {
 				break
 			} else if err != nil {
 				return nil, err
 			}
 
-			if err := binary.Read(file, endianess, &pcrEvent.event.specVersionMajor); err == io.EOF {
+			if err := binary.Read(file, endianess, &efiSpecEvent.specVersionMajor); err == io.EOF {
 				break
 			} else if err != nil {
 				return nil, err
 			}
 
-			if err := binary.Read(file, endianess, &pcrEvent.event.specErrata); err == io.EOF {
+			if err := binary.Read(file, endianess, &efiSpecEvent.specErrata); err == io.EOF {
 				break
 			} else if err != nil {
 				return nil, err
 			}
 
-			if err := binary.Read(file, endianess, &pcrEvent.event.uintnSize); err == io.EOF {
+			if err := binary.Read(file, endianess, &efiSpecEvent.uintnSize); err == io.EOF {
 				break
 			} else if err != nil {
 				return nil, err
 			}
 
-			if err := binary.Read(file, endianess, &pcrEvent.event.numberOfAlgorithms); err == io.EOF {
+			if err := binary.Read(file, endianess, &efiSpecEvent.numberOfAlgorithms); err == io.EOF {
 				break
 			} else if err != nil {
 				return nil, err
 			}
 
-			pcrEvent.event.digestSizes = make([]TcgEfiSpecIDEventAlgorithmSize, pcrEvent.event.numberOfAlgorithms)
-			for i := uint32(0); i < pcrEvent.event.numberOfAlgorithms; i++ {
-				if err := binary.Read(file, endianess, &pcrEvent.event.digestSizes[i].algorithID); err == io.EOF {
+			efiSpecEvent.digestSizes = make([]TcgEfiSpecIDEventAlgorithmSize, efiSpecEvent.numberOfAlgorithms)
+			for i := uint32(0); i < efiSpecEvent.numberOfAlgorithms; i++ {
+				if err := binary.Read(file, endianess, &efiSpecEvent.digestSizes[i].algorithID); err == io.EOF {
 					break
 				} else if err != nil {
 					return nil, err
 				}
-				if err := binary.Read(file, endianess, &pcrEvent.event.digestSizes[i].digestSize); err == io.EOF {
+				if err := binary.Read(file, endianess, &efiSpecEvent.digestSizes[i].digestSize); err == io.EOF {
 					break
 				} else if err != nil {
 					return nil, err
 				}
 			}
 
-			if err := binary.Read(file, endianess, &pcrEvent.event.vendorInfoSize); err == io.EOF {
+			if err := binary.Read(file, endianess, &efiSpecEvent.vendorInfoSize); err == io.EOF {
 				break
 			} else if err != nil {
 				return nil, err
 			}
 
-			pcrEvent.event.vendorInfo = make([]byte, pcrEvent.event.vendorInfoSize)
-			if err := binary.Read(file, endianess, &pcrEvent.event.vendorInfo); err == io.EOF {
+			efiSpecEvent.vendorInfo = make([]byte, efiSpecEvent.vendorInfoSize)
+			if err := binary.Read(file, endianess, &efiSpecEvent.vendorInfo); err == io.EOF {
 				break
 			} else if err != nil {
 				return nil, err
 			}
+
+			var in bytes.Buffer
+			binary.Write(&in, endianess, efiSpecEvent)
+			copy(pcrEvent.event, in.Bytes())
 
 			if BIOSLogTypes[BIOSLogID(pcrEvent.eventType)] != "" {
 				pcrDigest.PcrEventName = BIOSLogTypes[BIOSLogID(pcrEvent.eventType)]
@@ -242,6 +455,7 @@ func readTPM2Log(firmware FirmwareType) (*PCRLog, error) {
 			}
 
 			pcrDigest.PcrIndex = int(pcrEvent.pcrIndex)
+			pcrDigest.PcrEventData = string(pcrEvent.event)
 			pcrLog.PcrList = append(pcrLog.PcrList, pcrDigest)
 		} else {
 			if err := binary.Read(file, endianess, &pcrEvent.digests.count); err == io.EOF {
@@ -273,7 +487,8 @@ func readTPM2Log(firmware FirmwareType) (*PCRLog, error) {
 			}
 
 			// Placeholder
-			if err := binary.Read(file, endianess, make([]byte, pcrEvent.eventSize)); err == io.EOF {
+			pcrEvent.event = make([]byte, pcrEvent.eventSize)
+			if err := binary.Read(file, endianess, &pcrEvent.event); err == io.EOF {
 				break
 			} else if err != nil {
 				return nil, err
@@ -294,6 +509,10 @@ func readTPM2Log(firmware FirmwareType) (*PCRLog, error) {
 			}
 
 			pcrDigest.PcrIndex = int(pcrEvent.pcrIndex)
+			eventDataString, _ := getEventDataString(pcrEvent.eventType, pcrEvent.event)
+			if eventDataString != nil {
+				pcrDigest.PcrEventData = *eventDataString
+			}
 			pcrLog.PcrList = append(pcrLog.PcrList, pcrDigest)
 		}
 	}
@@ -339,6 +558,7 @@ func readTPM1Log(firmware FirmwareType) (*PCRLog, error) {
 		pcrDigest.Digests = make([]PCRDigestValue, 1)
 		pcrDigest.Digests[0].DigestAlg = TPMAlgSha
 		if BIOSLogID(pcrEvent.eventType) == EvNoAction {
+			var biosSpecEvent TcgBiosSpecIDEvent
 			if err := binary.Read(file, endianess, make([]byte, TPMAlgShaSize)); err == io.EOF {
 				break
 			} else if err != nil {
@@ -350,60 +570,65 @@ func readTPM1Log(firmware FirmwareType) (*PCRLog, error) {
 			} else if err != nil {
 				return nil, err
 			}
+			pcrEvent.event = make([]byte, pcrEvent.eventSize)
 
-			if err := binary.Read(file, endianess, &pcrEvent.event.signature); err == io.EOF {
+			if err := binary.Read(file, endianess, &biosSpecEvent.signature); err == io.EOF {
 				break
 			} else if err != nil {
 				return nil, err
 			}
 
-			identifier := string(bytes.Trim(pcrEvent.event.signature[:], "\x00"))
+			identifier := string(bytes.Trim(biosSpecEvent.signature[:], "\x00"))
 			if string(identifier) != TCGOldEfiFormatID {
 				continue
 			}
 
-			if err := binary.Read(file, endianess, &pcrEvent.event.platformClass); err == io.EOF {
+			if err := binary.Read(file, endianess, &biosSpecEvent.platformClass); err == io.EOF {
 				break
 			} else if err != nil {
 				return nil, err
 			}
 
-			if err := binary.Read(file, endianess, &pcrEvent.event.specVersionMinor); err == io.EOF {
+			if err := binary.Read(file, endianess, &biosSpecEvent.specVersionMinor); err == io.EOF {
 				break
 			} else if err != nil {
 				return nil, err
 			}
 
-			if err := binary.Read(file, endianess, &pcrEvent.event.specVersionMajor); err == io.EOF {
+			if err := binary.Read(file, endianess, &biosSpecEvent.specVersionMajor); err == io.EOF {
 				break
 			} else if err != nil {
 				return nil, err
 			}
 
-			if err := binary.Read(file, endianess, &pcrEvent.event.specErrata); err == io.EOF {
+			if err := binary.Read(file, endianess, &biosSpecEvent.specErrata); err == io.EOF {
 				break
 			} else if err != nil {
 				return nil, err
 			}
 
-			if err := binary.Read(file, endianess, &pcrEvent.event.uintnSize); err == io.EOF {
+			if err := binary.Read(file, endianess, &biosSpecEvent.uintnSize); err == io.EOF {
 				break
 			} else if err != nil {
 				return nil, err
 			}
 
-			if err := binary.Read(file, endianess, &pcrEvent.event.vendorInfoSize); err == io.EOF {
+			if err := binary.Read(file, endianess, &biosSpecEvent.vendorInfoSize); err == io.EOF {
 				break
 			} else if err != nil {
 				return nil, err
 			}
 
-			pcrEvent.event.vendorInfo = make([]byte, pcrEvent.event.vendorInfoSize)
-			if err := binary.Read(file, endianess, &pcrEvent.event.vendorInfo); err == io.EOF {
+			biosSpecEvent.vendorInfo = make([]byte, biosSpecEvent.vendorInfoSize)
+			if err := binary.Read(file, endianess, &biosSpecEvent.vendorInfo); err == io.EOF {
 				break
 			} else if err != nil {
 				return nil, err
 			}
+
+			var in bytes.Buffer
+			binary.Write(&in, endianess, biosSpecEvent)
+			copy(pcrEvent.event, in.Bytes())
 
 			if BIOSLogTypes[BIOSLogID(pcrEvent.eventType)] != "" {
 				pcrDigest.PcrEventName = BIOSLogTypes[BIOSLogID(pcrEvent.eventType)]
@@ -413,10 +638,12 @@ func readTPM1Log(firmware FirmwareType) (*PCRLog, error) {
 			}
 
 			pcrDigest.PcrIndex = int(pcrEvent.pcrIndex)
+			pcrDigest.PcrEventData = string(pcrEvent.event)
 			pcrLog.PcrList = append(pcrLog.PcrList, pcrDigest)
 		} else {
 			// Placeholder
-			if err := binary.Read(file, endianess, make([]byte, pcrEvent.eventSize)); err == io.EOF {
+			pcrEvent.event = make([]byte, pcrEvent.eventSize)
+			if err := binary.Read(file, endianess, &pcrEvent.event); err == io.EOF {
 				break
 			} else if err != nil {
 				return nil, err
@@ -430,6 +657,11 @@ func readTPM1Log(firmware FirmwareType) (*PCRLog, error) {
 			}
 			if EFILogTypes[EFILogID(pcrEvent.eventType)] != "" {
 				pcrDigest.PcrEventName = EFILogTypes[EFILogID(pcrEvent.eventType)]
+			}
+
+			eventDataString, _ := getEventDataString(pcrEvent.eventType, pcrEvent.event)
+			if eventDataString != nil {
+				pcrDigest.PcrEventData = *eventDataString
 			}
 
 			pcrDigest.PcrIndex = int(pcrEvent.pcrIndex)
@@ -473,4 +705,35 @@ func ParseLog(firmware FirmwareType, tpmSpec string) (*PCRLog, error) {
 	}
 
 	return pcrLog, nil
+}
+
+// DumpLog dumps the evenlog on stdio
+func DumpLog(tcpaLog *PCRLog) error {
+	for _, pcr := range tcpaLog.PcrList {
+		fmt.Printf("PCR: %d\n", pcr.PcrIndex)
+		fmt.Printf("Event Name: %s\n", pcr.PcrEventName)
+		fmt.Printf("Event Data: %s\n", stripControlSequences(pcr.PcrEventData))
+
+		for _, digest := range pcr.Digests {
+			var algoName string
+			switch digest.DigestAlg {
+			case TPMAlgSha:
+				algoName = "SHA1"
+			case TPMAlgSha256:
+				algoName = "SHA256"
+			case TPMAlgSha384:
+				algoName = "SHA384"
+			case TPMAlgSha512:
+				algoName = "SHA512"
+			case TPMAlgSm3s256:
+				algoName = "SM3"
+			}
+
+			fmt.Printf("%s Digest: %x\n", algoName, digest.Digest)
+		}
+
+		fmt.Println()
+	}
+
+	return nil
 }
