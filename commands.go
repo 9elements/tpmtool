@@ -22,6 +22,8 @@ const (
 	DefaultFilePermissions = 660
 	// Luks1HeaderLength is the LUKS1 header length
 	Luks1HeaderLength = 2048
+	// LinuxEFIFirmwareDir is the UEFI linux firmware directory
+	LinuxEFIFirmwareDir = "/sys/firmware/efi"
 )
 
 // Status Dumps the tpm status
@@ -303,4 +305,37 @@ func DiskExtend() error {
 	}
 
 	return TPMInterface.Measure(*diskCommandExtendPcr, luksHeader)
+}
+
+// EventlogDump dumps the eventlog
+func EventlogDump() error {
+	if *eventlogDumpFile != "" {
+		tpmtool.DefaultTCPABinaryLog = *eventlogDumpFile
+	}
+
+	var firmware tpmtool.FirmwareType
+	if *eventlogDumpFirmwareUefi {
+		firmware = tpmtool.Uefi
+	} else if *eventlogDumpFirmwareBios {
+		firmware = tpmtool.Bios
+	} else {
+		if _, err := os.Stat(LinuxEFIFirmwareDir); os.IsNotExist(err) {
+			firmware = tpmtool.Uefi
+		} else {
+			firmware = tpmtool.Bios
+		}
+	}
+
+	if *eventlogDumpTPMSpec1 {
+		TPMSpecVersion = tpm.TPM12
+	} else if *eventlogDumpTPMSpec2 {
+		TPMSpecVersion = tpm.TPM20
+	}
+
+	tcpaLog, err := tpmtool.ParseLog(firmware, TPMSpecVersion)
+	if err != nil {
+		return err
+	}
+
+	return tpmtool.DumpLog(tcpaLog)
 }

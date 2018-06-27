@@ -93,6 +93,14 @@ var (
 	diskCommandExtend       = diskCommand.Command("extend", "Extend luks header into a PCR")
 	diskCommandExtendDevice = diskCommandExtend.Arg("device", "Device which should be encrypted").Required().String()
 	diskCommandExtendPcr    = diskCommandExtend.Flag("pcr", "Set the PCR for the measurement operation").Required().Uint32()
+
+	eventlog                 = kingpin.Command("eventlog", "TPM eventlog operation")
+	eventlogDump             = eventlog.Command("dump", "Dump the eventlog")
+	eventlogDumpFirmwareUefi = eventlogDump.Flag("uefi", "Set UEFI firmware").Bool()
+	eventlogDumpFirmwareBios = eventlogDump.Flag("bios", "Set BIOS firmware").Bool()
+	eventlogDumpTPMSpec1     = eventlogDump.Flag("tpm12", "Set tpm12 specification").Bool()
+	eventlogDumpTPMSpec2     = eventlogDump.Flag("tpm20", "Set tpm20 specification").Bool()
+	eventlogDumpFile         = eventlogDump.Arg("log", "Custom eventlog file path").String()
 )
 
 func main() {
@@ -177,6 +185,10 @@ func main() {
 		}
 	case "disk extend":
 		if err := DiskExtend(); err != nil {
+			log.Fatalln(err.Error())
+		}
+	case "eventlog dump":
+		if err := EventlogDump(); err != nil {
 			log.Fatalln(err.Error())
 		}
 	default:
