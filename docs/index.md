@@ -31,6 +31,7 @@ TPM temporary deactivated: false
 -   Resealing of credentials using a sealing configuration for PCR pre-calculation
 -   List and read PCRs
 -   Measures a file into given PCR index.
+-   Dump TPM eventlog from OS or custom eventlog binary file input.
 -   Cryptsetup:
     -   Format device and seal credential.
     -   Open device by sealed credential.
