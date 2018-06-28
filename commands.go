@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"syscall"
+	"time"
 
 	"github.com/systemboot/systemboot/pkg/storage"
 	"github.com/systemboot/systemboot/pkg/tpm"
@@ -24,6 +25,8 @@ const (
 	Luks1HeaderLength = 2048
 	// LinuxEFIFirmwareDir is the UEFI linux firmware directory
 	LinuxEFIFirmwareDir = "/sys/firmware/efi"
+	// Delay is used for sealing operations delay
+	Delay = 900
 )
 
 // Status Dumps the tpm status
@@ -97,6 +100,9 @@ func OwnerResetLock() error {
 
 // CryptoSeal seals data aganst PCR with TPM
 func CryptoSeal() error {
+	// No shit sherlock, we are too fast Oo (go-tpm bug ?)
+	time.Sleep(Delay * time.Millisecond)
+
 	plainText, err := ioutil.ReadFile(*cryptoCommandSealPlainFile)
 	if err != nil {
 		return err
@@ -121,6 +127,9 @@ func CryptoSeal() error {
 
 // CryptoUnseal unseals data by the TPM against PCR
 func CryptoUnseal() error {
+	// No shit sherlock, we are too fast Oo (go-tpm bug ?)
+	time.Sleep(Delay * time.Millisecond)
+
 	cipherText, err := ioutil.ReadFile(*cryptoCommandUnsealCipherFile)
 	if err != nil {
 		return err
@@ -136,6 +145,9 @@ func CryptoUnseal() error {
 
 // CryptoReseal reseals a data by given sealing configuration
 func CryptoReseal() error {
+	// No shit sherlock, we are too fast Oo (go-tpm bug ?)
+	time.Sleep(Delay * time.Millisecond)
+
 	sealedFile, err := ioutil.ReadFile(*cryptoCommandResealKeyfile)
 	if err != nil {
 		return err
@@ -211,6 +223,9 @@ func PcrMeasure() error {
 
 // DiskFormat formats a device for luks setup.
 func DiskFormat() error {
+	// No shit sherlock, we are too fast Oo (go-tpm bug ?)
+	time.Sleep(Delay * time.Millisecond)
+
 	keystorePath, err := tpmtool.MountKeystore()
 	if err != nil {
 		return err
@@ -245,6 +260,9 @@ func DiskFormat() error {
 
 // DiskOpen opens a LUKS device
 func DiskOpen() error {
+	// No shit sherlock, we are too fast Oo (go-tpm bug ?)
+	time.Sleep(Delay * time.Millisecond)
+
 	keystorePath, err := tpmtool.MountKeystore()
 	if err != nil {
 		return err
