@@ -3,7 +3,7 @@ tpmtool is a tool for TPM interaction and disk encryption. It is written in pure
 # Basic Features
 
 -   Supports TPM 1.2 and 2.0 with [Go TSS](https://github.com/google/go-tpm).
--   Higher TPM abstraction layer (TSPI) is implemented in the [systemboot](https://github.com/systemboot/systemboot).
+-   Higher TPM abstraction layer (TSPI) is implemented.
 -   Written in pure Go.
 -   TPM states are derived by Linux sysfs.
 -   Automatic TSS selection based on TPM version.

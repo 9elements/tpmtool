@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/systemboot/systemboot/pkg/storage"
-	"github.com/systemboot/systemboot/pkg/tpm"
+	"github.com/systemboot/tpmtool/pkg/tpm"
 	"github.com/systemboot/tpmtool/pkg/tpmtool"
 )
 

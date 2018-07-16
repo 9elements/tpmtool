@@ -1,4 +1,4 @@
-package tpmtool
+package tpm
 
 import (
 	"bytes"
@@ -9,7 +9,7 @@ import (
 	"os"
 	"unicode/utf16"
 
-	"github.com/systemboot/systemboot/pkg/tpm"
+	"github.com/systemboot/tpmtool/pkg/tpmtool"
 )
 
 /*
@@ -31,7 +31,7 @@ var (
 )
 
 // HashAlgoToSize is a map converter for hash to length
-var HashAlgoToSize = map[TPMIAlgHash]TPMIAlgHashSize{
+var HashAlgoToSize = map[IAlgHash]IAlgHashSize{
 	TPMAlgSha:     TPMAlgShaSize,
 	TPMAlgSha256:  TPMAlgSha256Size,
 	TPMAlgSha384:  TPMAlgSha384Size,
@@ -330,7 +330,7 @@ func getEventDataString(eventType uint32, eventData []byte) (*string, error) {
 	return &eventInfo, errors.New("Event type couldn't get parsed")
 }
 
-func readTPM2Log(firmware FirmwareType) (*PCRLog, error) {
+func readTPM2Log(firmware tpmtool.FirmwareType) (*PCRLog, error) {
 	var pcrLog PCRLog
 	pcrLog.Firmware = firmware
 
@@ -464,7 +464,7 @@ func readTPM2Log(firmware FirmwareType) (*PCRLog, error) {
 				return nil, err
 			}
 
-			pcrEvent.digests.digests = make([]TPMTHA, pcrEvent.digests.count)
+			pcrEvent.digests.digests = make([]THA, pcrEvent.digests.count)
 			for i := uint32(0); i < pcrEvent.digests.count; i++ {
 				if err := binary.Read(file, endianess, &pcrEvent.digests.digests[i].hashAlg); err == io.EOF {
 					break
@@ -521,7 +521,7 @@ func readTPM2Log(firmware FirmwareType) (*PCRLog, error) {
 	return &pcrLog, nil
 }
 
-func readTPM1Log(firmware FirmwareType) (*PCRLog, error) {
+func readTPM1Log(firmware tpmtool.FirmwareType) (*PCRLog, error) {
 	var pcrLog PCRLog
 	pcrLog.Firmware = firmware
 
@@ -674,24 +674,24 @@ func readTPM1Log(firmware FirmwareType) (*PCRLog, error) {
 }
 
 // ParseLog is a ,..
-func ParseLog(firmware FirmwareType, tpmSpec string) (*PCRLog, error) {
+func ParseLog(firmware tpmtool.FirmwareType, tpmSpec string) (*PCRLog, error) {
 	var pcrLog *PCRLog
 	var err error
 
 	switch firmware {
-	case Uefi:
-	case Bios:
+	case tpmtool.Uefi:
+	case tpmtool.Bios:
 	default:
 		return nil, errors.New("Firmware not supported yet")
 	}
 
 	switch tpmSpec {
-	case tpm.TPM12:
+	case TPM12:
 		pcrLog, err = readTPM1Log(firmware)
 		if err != nil {
 			return nil, err
 		}
-	case tpm.TPM20:
+	case TPM20:
 		pcrLog, err = readTPM2Log(firmware)
 		if err != nil {
 			// Kernel eventlog workaround does not export agile measurement log..

@@ -1,7 +1,9 @@
-package tpmtool
+package tpm
 
 import (
 	"github.com/rekby/gpt"
+
+	"github.com/systemboot/tpmtool/pkg/tpmtool"
 )
 
 // [1] https://members.uefi.org/kws/documents/UEFI_Spec_2_7_A_Sept_6.pdf
@@ -72,21 +74,21 @@ type EFIVariableData struct {
 	variableData       []byte
 }
 
-// TPMIHA is a TPM2 structure
-type TPMIHA struct {
+// IHA is a TPM2 structure
+type IHA struct {
 	hash []byte
 }
 
-// TPMTHA is a TPM2 structure
-type TPMTHA struct {
-	hashAlg TPMIAlgHash
-	digest  TPMIHA
+// THA is a TPM2 structure
+type THA struct {
+	hashAlg IAlgHash
+	digest  IHA
 }
 
-// TPMLDigestValues is a TPM2 structure
-type TPMLDigestValues struct {
+// LDigestValues is a TPM2 structure
+type LDigestValues struct {
 	count   uint32
-	digests []TPMTHA
+	digests []THA
 }
 
 // TcgEfiSpecIDEventAlgorithmSize is a TPM2 structure
@@ -125,7 +127,7 @@ type TcgBiosSpecIDEvent struct {
 type TcgPcrEvent2 struct {
 	pcrIndex  uint32
 	eventType uint32
-	digests   TPMLDigestValues
+	digests   LDigestValues
 	eventSize uint32
 	event     []byte
 }
@@ -141,7 +143,7 @@ type TcgPcrEvent struct {
 
 // PCRDigestValue is the hash and algorithm
 type PCRDigestValue struct {
-	DigestAlg TPMIAlgHash
+	DigestAlg IAlgHash
 	Digest    []byte
 }
 
@@ -155,6 +157,6 @@ type PCRDigestInfo struct {
 
 // PCRLog is a generic PCR eventlog structure
 type PCRLog struct {
-	Firmware FirmwareType
+	Firmware tpmtool.FirmwareType
 	PcrList  []PCRDigestInfo
 }
