@@ -20,7 +20,11 @@ builds:
       - 7
     main: "."
     hooks:
-      post: upx --best --ultra-brute tpmtool
+      post:
+        - upx --best --ultra-brute dist/linux_amd64/tpmtool
+        - upx --best --ultra-brute dist/linux_arm_7/tpmtool
+        - upx --best --ultra-brute dist/linux_386/tpmtool
+        - upx --best --ultra-brute dist/linux_arm64/tpmtool
 nfpm:
   vendor: Facebook Inc.
   homepage: www.tpmtool.org
