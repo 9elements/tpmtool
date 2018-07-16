@@ -19,6 +19,8 @@ builds:
     goarm:
       - 7
     main: "."
+    hooks:
+      post: upx --best --ultra-brute tpmtool
 nfpm:
   vendor: Facebook Inc.
   homepage: www.tpmtool.org
