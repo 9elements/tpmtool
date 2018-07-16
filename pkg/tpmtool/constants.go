@@ -52,3 +52,6 @@ const (
 	// SeaBios is an implementation of a legacy BIOS
 	SeaBios BootloaderType = 2
 )
+
+// Luks1HeaderLength is the LUKS1 header length
+const Luks1HeaderLength = 2048

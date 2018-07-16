@@ -8,8 +8,6 @@ import (
 	"io"
 	"os"
 	"unicode/utf16"
-
-	"github.com/systemboot/tpmtool/pkg/tpmtool"
 )
 
 /*
@@ -330,7 +328,7 @@ func getEventDataString(eventType uint32, eventData []byte) (*string, error) {
 	return &eventInfo, errors.New("Event type couldn't get parsed")
 }
 
-func readTPM2Log(firmware tpmtool.FirmwareType) (*PCRLog, error) {
+func readTPM2Log(firmware string) (*PCRLog, error) {
 	var pcrLog PCRLog
 	pcrLog.Firmware = firmware
 
@@ -521,7 +519,7 @@ func readTPM2Log(firmware tpmtool.FirmwareType) (*PCRLog, error) {
 	return &pcrLog, nil
 }
 
-func readTPM1Log(firmware tpmtool.FirmwareType) (*PCRLog, error) {
+func readTPM1Log(firmware string) (*PCRLog, error) {
 	var pcrLog PCRLog
 	pcrLog.Firmware = firmware
 
@@ -674,16 +672,9 @@ func readTPM1Log(firmware tpmtool.FirmwareType) (*PCRLog, error) {
 }
 
 // ParseLog is a ,..
-func ParseLog(firmware tpmtool.FirmwareType, tpmSpec string) (*PCRLog, error) {
+func ParseLog(firmware string, tpmSpec string) (*PCRLog, error) {
 	var pcrLog *PCRLog
 	var err error
-
-	switch firmware {
-	case tpmtool.Uefi:
-	case tpmtool.Bios:
-	default:
-		return nil, errors.New("Firmware not supported yet")
-	}
 
 	switch tpmSpec {
 	case TPM12:

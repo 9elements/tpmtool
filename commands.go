@@ -21,8 +21,6 @@ const (
 	MaxPlatformConfigurationRegister = 24
 	// DefaultFilePermissions is the default write permission
 	DefaultFilePermissions = 660
-	// Luks1HeaderLength is the LUKS1 header length
-	Luks1HeaderLength = 2048
 	// LinuxEFIFirmwareDir is the UEFI linux firmware directory
 	LinuxEFIFirmwareDir = "/sys/firmware/efi"
 	// Delay is used for sealing operations delay
@@ -112,7 +110,7 @@ func CryptoSeal() error {
 		return errors.New("Plain text file is too big, max 256 bytes")
 	}
 
-	pcrInfo, err := PreCalculate(*cryptoCommandSealConfig)
+	pcrInfo, err := tpmtool.PreCalculate(TPMInterface, *cryptoCommandSealConfig)
 	if err != nil {
 		return err
 	}
@@ -153,7 +151,7 @@ func CryptoReseal() error {
 		return err
 	}
 
-	pcrInfo, err := PreCalculate(*cryptoCommandResealConfig)
+	pcrInfo, err := tpmtool.PreCalculate(TPMInterface, *cryptoCommandResealConfig)
 	if err != nil {
 		return err
 	}
@@ -245,7 +243,7 @@ func DiskFormat() error {
 		return err
 	}
 
-	pcrInfo, err := PreCalculate(*diskCommandFormatConfig)
+	pcrInfo, err := tpmtool.PreCalculate(TPMInterface, *diskCommandFormatConfig)
 	if err != nil {
 		return err
 	}
@@ -316,7 +314,7 @@ func DiskExtend() error {
 	}
 	defer deviceFD.Close()
 
-	luksHeader := make([]byte, Luks1HeaderLength)
+	luksHeader := make([]byte, tpmtool.Luks1HeaderLength)
 	_, err = deviceFD.Read(luksHeader)
 	if err != nil {
 		return err
@@ -328,7 +326,7 @@ func DiskExtend() error {
 // EventlogDump dumps the eventlog
 func EventlogDump() error {
 	if *eventlogDumpFile != "" {
-		tpmtool.DefaultTCPABinaryLog = *eventlogDumpFile
+		tpm.DefaultTCPABinaryLog = *eventlogDumpFile
 	}
 
 	var firmware tpmtool.FirmwareType
@@ -350,10 +348,10 @@ func EventlogDump() error {
 		TPMSpecVersion = tpm.TPM20
 	}
 
-	tcpaLog, err := tpmtool.ParseLog(firmware, TPMSpecVersion)
+	tcpaLog, err := tpm.ParseLog(string(firmware), TPMSpecVersion)
 	if err != nil {
 		return err
 	}
 
-	return tpmtool.DumpLog(tcpaLog)
+	return tpm.DumpLog(tcpaLog)
 }

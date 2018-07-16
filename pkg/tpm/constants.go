@@ -155,3 +155,6 @@ const TCGOldEfiFormatID string = "Spec ID Event02"
 
 // HCRTM string for event type EV_EFI_HCRTM_EVENT
 const HCRTM string = "HCRTM"
+
+// FirmwareType (BIOS)
+type FirmwareType string

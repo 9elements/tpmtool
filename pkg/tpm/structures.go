@@ -2,8 +2,6 @@ package tpm
 
 import (
 	"github.com/rekby/gpt"
-
-	"github.com/systemboot/tpmtool/pkg/tpmtool"
 )
 
 // [1] https://members.uefi.org/kws/documents/UEFI_Spec_2_7_A_Sept_6.pdf
@@ -157,6 +155,6 @@ type PCRDigestInfo struct {
 
 // PCRLog is a generic PCR eventlog structure
 type PCRLog struct {
-	Firmware tpmtool.FirmwareType
+	Firmware string
 	PcrList  []PCRDigestInfo
 }
