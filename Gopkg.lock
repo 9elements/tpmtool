@@ -41,7 +41,7 @@
   branch = "master"
   name = "github.com/google/go-tpm"
   packages = ["tpm","tpmutil"]
-  revision = "180f7885cb387ab49323fbef6e042890f6e7d4fc"
+  revision = "e965e8a65d24d3bb2e9daaf23686b645e0bf76fe"
 
 [[projects]]
   branch = "master"
@@ -71,7 +71,7 @@
   branch = "master"
   name = "github.com/systemboot/systemboot"
   packages = ["pkg/storage","pkg/tpm"]
-  revision = "0b3658ee78ad6407a4a153e8526776f028b98dd4"
+  revision = "a642c9c31e0b58c1bc22fa204cd3cc5008447927"
 
 [[projects]]
   name = "gopkg.in/alecthomas/kingpin.v2"
@@ -88,6 +88,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "0d79601bd7b584d638b52c1f799ac875e4860584a3eade2f9f65fbaf14018eb4"
+  inputs-digest = "66098ff1daba504c2a19897ce0cedb6a326f8a248f47e6e28e7173a76c41780c"
   solver-name = "gps-cdcl"
   solver-version = 1

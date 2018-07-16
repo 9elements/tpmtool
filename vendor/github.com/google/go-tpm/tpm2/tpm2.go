@@ -251,7 +251,7 @@ func encodePasswordAuthArea(passwords ...string) ([]byte, error) {
 }
 
 func encodePCREvent(pcr tpmutil.Handle, eventData []byte) ([]byte, error) {
-	ha, err := tpmutil.Pack(pcr, HandleNull)
+	ha, err := tpmutil.Pack(pcr)
 	if err != nil {
 		return nil, err
 	}
@@ -993,12 +993,16 @@ func encodeSign(key tpmutil.Handle, password string, digest []byte, sigScheme *S
 	if err != nil {
 		return nil, err
 	}
+	hc, err := tpmutil.Pack(tagHashCheck)
+	if err != nil {
+		return nil, err
+	}
 	params, err := tpmutil.Pack(HandleNull, []byte(nil))
 	if err != nil {
 		return nil, err
 	}
 
-	return concat(ha, auth, d, s, params)
+	return concat(ha, auth, d, s, hc, params)
 }
 
 func decodeSign(buf []byte) (*Signature, error) {

@@ -23,7 +23,6 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"flag"
-	"io"
 	"math/big"
 	"os"
 	"reflect"
@@ -32,22 +31,9 @@ import (
 	"github.com/google/go-tpm/tpmutil"
 )
 
-var tpmPath = flag.String("tpm_path", "", "Path to TPM character device. Most Linux systems expose it under /dev/tpm0. Empty value (default) will disable all integration tests.")
-
 func TestMain(m *testing.M) {
 	flag.Parse()
 	os.Exit(m.Run())
-}
-
-func openTPM(t *testing.T) io.ReadWriteCloser {
-	if *tpmPath == "" {
-		t.SkipNow()
-	}
-	rw, err := OpenTPM(*tpmPath)
-	if err != nil {
-		t.Fatalf("OpenTPM failed: %s", err)
-	}
-	return rw
 }
 
 var (
@@ -511,7 +497,14 @@ func TestSign(t *testing.T) {
 
 		digest := sha256.Sum256([]byte("heyo"))
 
-		sig, err := Sign(rw, signerHandle, defaultPassword, digest[:], &SigScheme{Alg: AlgRSASSA, Hash: AlgSHA256})
+		var scheme *SigScheme
+		if pub.RSAParameters != nil {
+			scheme = pub.RSAParameters.Sign
+		}
+		if pub.ECCParameters != nil {
+			scheme = pub.ECCParameters.Sign
+		}
+		sig, err := Sign(rw, signerHandle, defaultPassword, digest[:], scheme)
 		if err != nil {
 			t.Fatalf("Sign failed: %s", err)
 		}
@@ -557,4 +550,14 @@ func TestSign(t *testing.T) {
 			},
 		})
 	})
+}
+
+func TestPCREvent(t *testing.T) {
+	rw := openTPM(t)
+	defer rw.Close()
+	debugPCR := uint32(16)
+	arbitraryBytes := []byte{1}
+	if err := PCREvent(rw, tpmutil.Handle(debugPCR), arbitraryBytes); err != nil {
+		t.Fatal(err)
+	}
 }
