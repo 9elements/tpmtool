@@ -20,7 +20,7 @@ builds:
       - 7
     main: "."
     hooks:
-      post: ./scripts/post.h
+      post: ./scripts/post.sh
 nfpm:
   vendor: Facebook Inc.
   homepage: www.tpmtool.org
