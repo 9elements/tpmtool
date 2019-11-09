@@ -1,4 +1,4 @@
-// Copyright (c) 2014, Google Inc. All rights reserved.
+// Copyright (c) 2014, Google LLC All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"crypto/sha1"
+	"crypto/x509"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -57,6 +58,18 @@ func TestGetKeys(t *testing.T) {
 	t.Logf("Got %d keys: % d\n", len(handles), handles)
 }
 
+func TestGetManufacturer(t *testing.T) {
+	rwc := openTPMOrSkip(t)
+	defer rwc.Close()
+
+	vendorID, err := GetManufacturer(rwc)
+	if err != nil {
+		t.Fatal("Couldn't read VendorID from TPM:", err)
+	}
+
+	t.Logf("TPM VendorID: %v\n", vendorID)
+}
+
 func TestPcrExtend(t *testing.T) {
 	rwc := openTPMOrSkip(t)
 	defer rwc.Close()
@@ -81,6 +94,24 @@ func TestPcrExtend(t *testing.T) {
 		t.Logf("PCR are equal!\n")
 	} else {
 		t.Fatal("PCR are not equal! Test failed.\n")
+	}
+}
+
+func TestReadEKCert(t *testing.T) {
+	rwc := openTPMOrSkip(t)
+	defer rwc.Close()
+
+	ownAuth := getAuth(ownerAuthEnvVar)
+	cert, err := ReadEKCert(rwc, ownAuth)
+	if err != nil {
+		t.Fatal("Unable to read EKCert from NVRAM:", err)
+	}
+
+	x509cert, err := x509.ParseCertificate(cert)
+	if err != nil {
+		t.Logf("Malformed certificate: %v\n", err)
+	} else {
+		t.Logf("Certificate: %v\n", x509cert)
 	}
 }
 
@@ -185,13 +216,13 @@ func TestResizeableSlice(t *testing.T) {
 		t.Fatal("Couldn't read random bytes into the byte array")
 	}
 
-	bb, err := tpmutil.Pack(ra, b)
+	bb, err := tpmutil.Pack(ra, tpmutil.U32Bytes(b))
 	if err != nil {
 		t.Fatal("Couldn't pack the bytes:", err)
 	}
 
 	var ra2 responseAuth
-	var b2 []byte
+	var b2 tpmutil.U32Bytes
 	if _, err := tpmutil.Unpack(bb, &ra2, &b2); err != nil {
 		t.Fatal("Couldn't unpack the resizeable values:", err)
 	}
@@ -501,12 +532,12 @@ func TestTakeOwnership(t *testing.T) {
 	srkAuth := getAuth(srkAuthEnvVar)
 
 	// This test assumes that the TPM has been cleared using OwnerClear.
-	pubek, err := ReadPubEK(rwc)
+	pubEK, err := ReadPubEK(rwc)
 	if err != nil {
 		t.Fatal("Couldn't read the public endorsement key from the TPM:", err)
 	}
 
-	if err := TakeOwnership(rwc, ownerAuth, srkAuth, pubek); err != nil {
+	if err := TakeOwnership(rwc, ownerAuth, srkAuth, pubEK); err != nil {
 		t.Fatal("Couldn't take ownership of the TPM:", err)
 	}
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2018, Google Inc. All rights reserved.
+// Copyright (c) 2018, Google LLC All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,13 +17,11 @@ package tpm
 import (
 	"io"
 	"testing"
-
-	"github.com/google/go-tpm/tpmutil"
 )
 
 // Skip the test if we can't open the TPM.
 func openTPMOrSkip(t *testing.T) io.ReadWriteCloser {
-	rwc, err := OpenTPM(tpmutil.HighPriority)
+	rwc, err := OpenTPM()
 	if err != nil {
 		t.Skipf("Skipping test, since we can't access the TPM: %s\n", err)
 	}
