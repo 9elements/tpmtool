@@ -6,15 +6,18 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strconv"
 )
 
 // NetBooter implements the Booter interface for booting over DHCPv6.
 // See NewNetBooterDHCPv6 for details on the fields.
 type NetBooter struct {
-	Type        string `json:"type"`
-	Method      string `json:"method"`
-	MAC         string `json:"mac"`
-	OverrideURL string `json:"override_url,omitempty"`
+	Type           string  `json:"type"`
+	Method         string  `json:"method"`
+	MAC            string  `json:"mac"`
+	OverrideURL    *string `json:"override_url,omitempty"`
+	Retries        *int    `json:"retries,omitempty"`
+	DebugOnFailure bool    `json:"debug_on_failure,omitempty"`
 }
 
 // NewNetBooter parses a boot entry config and returns a Booter instance, or an
@@ -26,7 +29,9 @@ func NewNetBooter(config []byte) (Booter, error) {
 	//     "type": "netboot",
 	//     "method": "<method>",
 	//     "mac": "<mac_addr>",
-	//     "override_url": "<url>"
+	//     "override_url": "<url>",
+	//     "retries": <num_retries>,
+	//     "debug_on_failure": <true|false>
 	// }
 	//
 	// `type` is always set to "netboot".
@@ -35,6 +40,11 @@ func NewNetBooter(config []byte) (Booter, error) {
 	// `override_url` is an optional URL used to override the boot file URL used
 	//   to fetch the network boot program. This field becomes mandatory if
 	//   `method` is set to "slaac".
+	// `retries` is the number of times a DHCP request should be retried if
+	//   failed. If unspecified, it will use the underlying `netboot` program's
+	//   default.
+	// `debug_on_failure` is an optional boolean that will signal a request for
+	//   a debugging attempt if netboot fails.
 	//
 	// An example configuration is:
 	// {
@@ -66,13 +76,28 @@ func NewNetBooter(config []byte) (Booter, error) {
 // `netboot` command
 func (nb *NetBooter) Boot() error {
 	bootcmd := []string{"netboot", "-d", "-userclass", "linuxboot"}
+	if nb.OverrideURL != nil {
+		bootcmd = append(bootcmd, "-netboot-url", *nb.OverrideURL)
+	}
+	if nb.Retries != nil {
+		bootcmd = append(bootcmd, "-retries", strconv.Itoa(*nb.Retries))
+	}
+	if nb.Method == "dhcpv6" {
+		bootcmd = append(bootcmd, []string{"-6=true", "-4=false"}...)
+	} else if nb.Method == "dhcpv4" {
+		bootcmd = append(bootcmd, []string{"-6=false", "-4=true"}...)
+	} else {
+		return fmt.Errorf("netboot: unknown method %s", nb.Method)
+	}
+	if nb.DebugOnFailure {
+		bootcmd = append(bootcmd, "-fix")
+	}
 	log.Printf("Executing command: %v", bootcmd)
 	cmd := exec.Command(bootcmd[0], bootcmd[1:]...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	if err := cmd.Run(); err != nil {
-		log.Printf("Error executing %v: %v", cmd, err)
+		return fmt.Errorf("Error executing %v: %v", cmd, err)
 	}
-	// This should be never reached
 	return nil
 }
 

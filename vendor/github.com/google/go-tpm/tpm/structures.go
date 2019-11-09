@@ -1,4 +1,4 @@
-// Copyright (c) 2014, Google Inc. All rights reserved.
+// Copyright (c) 2014, Google LLC All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -69,7 +69,7 @@ type pcrInfo struct {
 
 // A capVersionInfo contains information about the TPM itself. Note that this
 // is deserialized specially, since it has a variable-length byte array but no
-// length. It is preceeded with a length in the response to the Quote2 command.
+// length. It is preceded with a length in the response to the Quote2 command.
 type capVersionInfo struct {
 	CapVersionFixed capVersionInfoFixed
 	VendorSpecific  []byte
@@ -188,64 +188,71 @@ func (ra responseAuth) String() string {
 }
 
 // These are the parameters of a TPM key.
-type keyParms struct {
+type keyParams struct {
 	AlgID     uint32
 	EncScheme uint16
 	SigScheme uint16
-	Parms     []byte // Serialized rsaKeyParms or symmetricKeyParms.
+	Params    tpmutil.U32Bytes // Serialized rsaKeyParams or symmetricKeyParams.
 }
 
-// An rsaKeyParms encodes the length of the RSA prime in bits, the number of
+// An rsaKeyParams encodes the length of the RSA prime in bits, the number of
 // primes in its factored form, and the exponent used for public-key
 // encryption.
-type rsaKeyParms struct {
+type rsaKeyParams struct {
 	KeyLength uint32
 	NumPrimes uint32
-	Exponent  []byte
+	Exponent  tpmutil.U32Bytes
 }
 
-type symmetricKeyParms struct {
+type symmetricKeyParams struct {
 	KeyLength uint32
 	BlockSize uint32
-	IV        []byte
+	IV        tpmutil.U32Bytes
 }
 
 // A key is a TPM representation of a key.
 type key struct {
-	Version        uint32
-	KeyUsage       uint16
-	KeyFlags       uint32
-	AuthDataUsage  byte
-	AlgorithmParms keyParms
-	PCRInfo        []byte
-	PubKey         []byte
-	EncData        []byte
+	Version         uint32
+	KeyUsage        uint16
+	KeyFlags        uint32
+	AuthDataUsage   byte
+	AlgorithmParams keyParams
+	PCRInfo         tpmutil.U32Bytes
+	PubKey          tpmutil.U32Bytes
+	EncData         tpmutil.U32Bytes
 }
 
 // A key12 is a newer TPM representation of a key.
 type key12 struct {
-	Tag            uint16
-	Zero           uint16 // Always all 0.
-	KeyUsage       uint16
-	KeyFlags       uint32
-	AuthDataUsage  byte
-	AlgorithmParms keyParms
-	PCRInfo        []byte // This must be a serialization of a pcrInfoLong.
-	PubKey         []byte
-	EncData        []byte
+	Tag             uint16
+	Zero            uint16 // Always all 0.
+	KeyUsage        uint16
+	KeyFlags        uint32
+	AuthDataUsage   byte
+	AlgorithmParams keyParams
+	PCRInfo         tpmutil.U32Bytes // This must be a serialization of a pcrInfoLong.
+	PubKey          tpmutil.U32Bytes
+	EncData         tpmutil.U32Bytes
 }
 
 // A pubKey represents a public key known to the TPM.
 type pubKey struct {
-	AlgorithmParms keyParms
-	Key            []byte
+	AlgorithmParams keyParams
+	Key             tpmutil.U32Bytes
+}
+
+// A symKey is a TPM representation of a symmetric key.
+type symKey struct {
+	AlgID     uint32
+	EncScheme uint16
+	Key       tpmutil.U16Bytes // TPM_SYMMETRIC_KEY uses a 16-bit header for Key data
 }
 
 // A tpmStoredData holds sealed data from the TPM.
 type tpmStoredData struct {
 	Version uint32
-	Info    []byte
-	Enc     []byte
+	Info    tpmutil.U32Bytes
+	Enc     tpmutil.U32Bytes
 }
 
 // String returns a string representation of a tpmStoredData.
@@ -271,7 +278,7 @@ type quoteInfo struct {
 // A pcrComposite stores a selection of PCRs with the selected PCR values.
 type pcrComposite struct {
 	Selection pcrSelection
-	Values    []byte
+	Values    tpmutil.U32Bytes
 }
 
 // convertPubKey converts a public key into TPM form. Currently, this function
@@ -285,7 +292,7 @@ func convertPubKey(pk crypto.PublicKey) (*pubKey, error) {
 		return nil, errors.New("The provided Privacy CA RSA public key was not a 2048-bit key")
 	}
 
-	rsakp := rsaKeyParms{
+	rsakp := rsaKeyParams{
 		KeyLength: 2048,
 		NumPrimes: 2,
 		Exponent:  big.NewInt(int64(pkRSA.E)).Bytes(),
@@ -294,16 +301,16 @@ func convertPubKey(pk crypto.PublicKey) (*pubKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	kp := keyParms{
+	kp := keyParams{
 		AlgID:     algRSA,
 		EncScheme: esNone,
 		SigScheme: ssRSASaPKCS1v15SHA1,
-		Parms:     rsakpb,
+		Params:    rsakpb,
 	}
-	pubk := pubKey{
-		AlgorithmParms: kp,
-		Key:            pkRSA.N.Bytes(),
+	pubKey := pubKey{
+		AlgorithmParams: kp,
+		Key:             pkRSA.N.Bytes(),
 	}
 
-	return &pubk, nil
+	return &pubKey, nil
 }
