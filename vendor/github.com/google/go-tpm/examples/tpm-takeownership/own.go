@@ -1,4 +1,6 @@
-// Copyright (c) 2014, Google Inc. All rights reserved.
+// +build !windows
+
+// Copyright (c) 2014, Google LLC All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -53,13 +55,13 @@ func main() {
 		copy(srkAuth[:], sa[:])
 	}
 
-	pubek, err := tpm.ReadPubEK(rwc)
+	pubEK, err := tpm.ReadPubEK(rwc)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Couldn't read the endorsement key: %s\n", err)
 		return
 	}
 
-	if err := tpm.TakeOwnership(rwc, ownerAuth, srkAuth, pubek); err != nil {
+	if err := tpm.TakeOwnership(rwc, ownerAuth, srkAuth, pubEK); err != nil {
 		fmt.Fprintf(os.Stderr, "Couldn't take ownership of the TPM: %s\n", err)
 		return
 	}

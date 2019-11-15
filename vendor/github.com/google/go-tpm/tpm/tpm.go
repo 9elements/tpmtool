@@ -1,4 +1,4 @@
-// Copyright (c) 2014, Google Inc. All rights reserved.
+// Copyright (c) 2014, Google LLC All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,32 +18,24 @@ package tpm
 import (
 	"bytes"
 	"crypto"
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha1"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 
 	"github.com/google/go-tpm/tpmutil"
 )
 
-// OpenTPM opens a channel to the TPM at the given path. If the file is a
-// device, then it treats it like a normal TPM device, and if the file is a
-// Unix domain socket, then it opens a connection to the socket.
-var OpenTPM = tpmutil.OpenTPM
-
 // GetKeys gets the list of handles for currently-loaded TPM keys.
 func GetKeys(rw io.ReadWriter) ([]tpmutil.Handle, error) {
-	var b []byte
-	subCap, err := tpmutil.Pack(rtKey)
+	b, err := getCapability(rw, capHandle, rtKey)
 	if err != nil {
-		return nil, err
-	}
-	in := []interface{}{capHandle, subCap}
-	out := []interface{}{&b}
-	if _, err := submitTPMRequest(rw, tagRQUCommand, ordGetCapability, in, out); err != nil {
 		return nil, err
 	}
 	var handles []tpmutil.Handle
@@ -96,7 +88,7 @@ func FetchPCRValues(rw io.ReadWriter, pcrVals []int) ([]byte, error) {
 
 // GetRandom gets random bytes from the TPM.
 func GetRandom(rw io.ReadWriter, size uint32) ([]byte, error) {
-	var b []byte
+	var b tpmutil.U32Bytes
 	in := []interface{}{size}
 	out := []interface{}{&b}
 	// There's no need to check the ret value here, since the err value
@@ -180,7 +172,7 @@ func Quote2(rw io.ReadWriter, handle tpmutil.Handle, data []byte, pcrVals []int,
 	}
 
 	// Check response authentication.
-	raIn := []interface{}{ret, ordQuote2, pcrShort, capBytes, sig}
+	raIn := []interface{}{ret, ordQuote2, pcrShort, tpmutil.U32Bytes(capBytes), tpmutil.U32Bytes(sig)}
 	if err := ra.verify(ca.NonceOdd, sharedSecret[:], raIn); err != nil {
 		return nil, err
 	}
@@ -257,7 +249,7 @@ func newOSAPSession(rw io.ReadWriter, entityType uint16, entityValue tpmutil.Han
 	hm.Write(osapData)
 	// Note that crypto/hash.Sum returns a slice rather than an array, so we
 	// have to copy this into an array to make sure that serialization doesn't
-	// preprend a length in tpmutil.Pack().
+	// prepend a length in tpmutil.Pack().
 	sharedSecretBytes := hm.Sum(nil)
 	copy(sharedSecret[:], sharedSecretBytes)
 	return sharedSecret, osapr, nil
@@ -356,7 +348,7 @@ func sealHelper(rw io.ReadWriter, pcrInfo *pcrInfoLong, data []byte, srkAuth []b
 	// digest = SHA1(ordSeal || encAuth || binary.Size(pcrInfo) || pcrInfo ||
 	//               len(data) || data)
 	//
-	authIn := []interface{}{ordSeal, sc.EncAuth, uint32(binary.Size(pcrInfo)), pcrInfo, data}
+	authIn := []interface{}{ordSeal, sc.EncAuth, uint32(binary.Size(pcrInfo)), pcrInfo, tpmutil.U32Bytes(data)}
 	ca, err := newCommandAuth(osapr.AuthHandle, osapr.NonceEven, sharedSecret[:], authIn)
 	if err != nil {
 		return nil, err
@@ -449,7 +441,7 @@ func Unseal(rw io.ReadWriter, sealed []byte, srkAuth []byte) ([]byte, error) {
 	}
 
 	// Check the response authentication.
-	raIn := []interface{}{ret, ordUnseal, unsealed}
+	raIn := []interface{}{ret, ordUnseal, tpmutil.U32Bytes(unsealed)}
 	if err := ra1.verify(ca1.NonceOdd, sharedSecret[:], raIn); err != nil {
 		return nil, err
 	}
@@ -491,7 +483,7 @@ func Quote(rw io.ReadWriter, handle tpmutil.Handle, data []byte, pcrNums []int, 
 	}
 
 	// Check response authentication.
-	raIn := []interface{}{ret, ordQuote, pcrc, sig}
+	raIn := []interface{}{ret, ordQuote, pcrc, tpmutil.U32Bytes(sig)}
 	if err := ra.verify(ca.NonceOdd, sharedSecret[:], raIn); err != nil {
 		return nil, nil, err
 	}
@@ -548,14 +540,14 @@ func MakeIdentity(rw io.ReadWriter, srkAuth []byte, ownerAuth []byte, aikAuth []
 	}
 
 	if pk != nil {
-		pubk, err := convertPubKey(pk)
+		pubKey, err := convertPubKey(pk)
 		if err != nil {
 			return nil, err
 		}
 
 		// We can't pack the pair of values directly, since the label is
 		// included directly as bytes, without any length.
-		fullpkb, err := tpmutil.Pack(pubk)
+		fullpkb, err := tpmutil.Pack(pubKey)
 		if err != nil {
 			return nil, err
 		}
@@ -564,29 +556,29 @@ func MakeIdentity(rw io.ReadWriter, srkAuth []byte, ownerAuth []byte, aikAuth []
 		caDigest = sha1.Sum(caDigestBytes)
 	}
 
-	rsaAIKParms := rsaKeyParms{
+	rsaAIKParams := rsaKeyParams{
 		KeyLength: 2048,
 		NumPrimes: 2,
 		//Exponent:  big.NewInt(0x10001).Bytes(), // 65537. Implicit?
 	}
-	packedParms, err := tpmutil.Pack(rsaAIKParms)
+	packedParams, err := tpmutil.Pack(rsaAIKParams)
 	if err != nil {
 		return nil, err
 	}
 
-	aikParms := keyParms{
+	aikParams := keyParams{
 		AlgID:     algRSA,
 		EncScheme: esNone,
 		SigScheme: ssRSASaPKCS1v15SHA1,
-		Parms:     packedParms,
+		Params:    packedParams,
 	}
 
 	aik := &key{
-		Version:        0x01010000,
-		KeyUsage:       keyIdentity,
-		KeyFlags:       0,
-		AuthDataUsage:  authAlways,
-		AlgorithmParms: aikParms,
+		Version:         0x01010000,
+		KeyUsage:        keyIdentity,
+		KeyFlags:        0,
+		AuthDataUsage:   authAlways,
+		AlgorithmParams: aikParams,
 	}
 
 	// The digest input for MakeIdentity authentication is
@@ -610,7 +602,7 @@ func MakeIdentity(rw io.ReadWriter, srkAuth []byte, ownerAuth []byte, aikAuth []
 	}
 
 	// Check response authentication.
-	raIn := []interface{}{ret, ordMakeIdentity, k, sig}
+	raIn := []interface{}{ret, ordMakeIdentity, k, tpmutil.U32Bytes(sig)}
 	if err := ra1.verify(ca1.NonceOdd, sharedSecretSRK[:], raIn); err != nil {
 		return nil, err
 	}
@@ -619,13 +611,131 @@ func MakeIdentity(rw io.ReadWriter, srkAuth []byte, ownerAuth []byte, aikAuth []
 		return nil, err
 	}
 
-	// TODO(tmroeder): check the signature against the pubek.
+	// TODO(tmroeder): check the signature against the pubEK.
 	blob, err := tpmutil.Pack(k)
 	if err != nil {
 		return nil, err
 	}
 
 	return blob, nil
+}
+
+func unloadTrspiCred(blob []byte) ([]byte, error) {
+	/*
+	 * Trousers expects the asym blob to have an additional data in the header.
+	 * The relevant data is duplicated in the TPM_SYMMETRIC_KEY struct so we parse
+	 * and throw the header away.
+	 * TODO(dkarch): Trousers is not doing credential activation correctly. We should
+	 * remove this and instead expose the asymmetric decryption and symmetric decryption
+	 * so that anyone generating a challenge for Trousers can unload the header themselves
+	 * and send us a correctly formatted challenge.
+	 */
+
+	var header struct {
+		Credsize  uint32
+		AlgID     uint32
+		EncScheme uint16
+		SigScheme uint16
+		Parmsize  uint32
+	}
+
+	symbuf := bytes.NewReader(blob)
+	if err := binary.Read(symbuf, binary.BigEndian, &header); err != nil {
+		return nil, err
+	}
+	// Unload the symmetric key parameters.
+	parms := make([]byte, header.Parmsize)
+	if err := binary.Read(symbuf, binary.BigEndian, parms); err != nil {
+		return nil, err
+	}
+	// Unload and return the symmetrically encrypted secret.
+	cred := make([]byte, header.Credsize)
+	if err := binary.Read(symbuf, binary.BigEndian, cred); err != nil {
+		return nil, err
+	}
+	return cred, nil
+}
+
+// ActivateIdentity asks the TPM to decrypt an EKPub encrypted symmetric session key
+// which it uses to decrypt the symmetrically encrypted secret.
+func ActivateIdentity(rw io.ReadWriter, aikAuth []byte, ownerAuth []byte, aik tpmutil.Handle, asym, sym []byte) ([]byte, error) {
+	// Run OIAP for the AIK.
+	oiaprAIK, err := oiap(rw)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start OIAP session: %v", err)
+	}
+
+	// Run OSAP for the owner, reading a random OddOSAP for our initial command
+	// and getting back a secret and a handle.
+	sharedSecretOwn, osaprOwn, err := newOSAPSession(rw, etOwner, khOwner, ownerAuth)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start OSAP session: %v", err)
+	}
+	defer osaprOwn.Close(rw)
+	defer zeroBytes(sharedSecretOwn[:])
+
+	authIn := []interface{}{ordActivateIdentity, tpmutil.U32Bytes(asym)}
+	ca1, err := newCommandAuth(oiaprAIK.AuthHandle, oiaprAIK.NonceEven, aikAuth, authIn)
+	if err != nil {
+		return nil, fmt.Errorf("newCommandAuth failed: %v", err)
+	}
+	ca2, err := newCommandAuth(osaprOwn.AuthHandle, osaprOwn.NonceEven, sharedSecretOwn[:], authIn)
+	if err != nil {
+		return nil, fmt.Errorf("newCommandAuth failed: %v", err)
+	}
+
+	symkey, ra1, ra2, ret, err := activateIdentity(rw, aik, asym, ca1, ca2)
+	if err != nil {
+		return nil, fmt.Errorf("activateIdentity failed: %v", err)
+	}
+
+	// Check response authentication.
+	raIn := []interface{}{ret, ordActivateIdentity, symkey}
+	if err := ra1.verify(ca1.NonceOdd, aikAuth, raIn); err != nil {
+		return nil, fmt.Errorf("aik resAuth failed to verify: %v", err)
+	}
+
+	if err := ra2.verify(ca2.NonceOdd, sharedSecretOwn[:], raIn); err != nil {
+		return nil, fmt.Errorf("owner resAuth failed to verify: %v", err)
+	}
+
+	cred, err := unloadTrspiCred(sym)
+	var (
+		block     cipher.Block
+		iv        []byte
+		ciphertxt []byte
+		secret    []byte
+	)
+	switch id := symkey.AlgID; id {
+	case algAES128:
+		block, err = aes.NewCipher(symkey.Key)
+		if err != nil {
+			return nil, fmt.Errorf("aes.NewCipher failed: %v", err)
+		}
+		iv = cred[:aes.BlockSize]
+		ciphertxt = cred[aes.BlockSize:]
+		secret = ciphertxt
+	default:
+		return nil, fmt.Errorf("%v is not a supported session key algorithm", id)
+	}
+	switch es := symkey.EncScheme; es {
+	case esSymCTR:
+		stream := cipher.NewCTR(block, iv)
+		stream.XORKeyStream(secret, ciphertxt)
+	case esSymOFB:
+		stream := cipher.NewOFB(block, iv)
+		stream.XORKeyStream(secret, ciphertxt)
+	case esSymCBCPKCS5:
+		mode := cipher.NewCBCDecrypter(block, iv)
+		mode.CryptBlocks(secret, ciphertxt)
+		// Remove PKCS5 padding.
+		padlen := int(secret[len(secret)-1])
+		secret = secret[:len(secret)-padlen]
+	default:
+		return nil, fmt.Errorf("%v is not a supported encryption scheme", es)
+	}
+
+	return secret, nil
 }
 
 // ResetLockValue resets the dictionary-attack value in the TPM; this allows the
@@ -713,6 +823,112 @@ func OwnerReadSRK(rw io.ReadWriter, ownerAuth digest) ([]byte, error) {
 	return tpmutil.Pack(pk)
 }
 
+// ReadEKCert reads the EKCert from the NVRAM.
+// The TCG PC Client specifies additional headers that are to be stored with the EKCert, we parse them
+// here and return only the DER encoded certificate.
+// TCG PC Client Specific Implementation Specification for Conventional BIOS 7.4.4
+// https://www.trustedcomputinggroup.org/wp-content/uploads/TCG_PCClientImplementation_1-21_1_00.pdf
+func ReadEKCert(rw io.ReadWriter, ownAuth digest) ([]byte, error) {
+	const (
+		certIndex                 = 0x1000f000 // TPM_NV_INDEX_EKCert (TPM Main Part 2 TPM Structures 19.1.2)
+		certTagPCClientStoredCert = 0x1001     // TCG_TAG_PCCLIENT_STORED_CERT
+		certTagPCClientFullCert   = 0x1002     // TCG_TAG_PCCLIENT_FULL_CERT
+		tcgFullCert               = 0          // TCG_FULL_CERT
+		tcgPartialSmallCert       = 1          // TCG_PARTIAL_SMALL_CERT
+	)
+	offset := uint32(0)
+	var header struct {
+		Tag      uint16
+		CertType uint8
+		CertSize uint16
+	}
+
+	data, err := NVReadValue(rw, certIndex, offset, uint32(binary.Size(header)), ownAuth)
+	if err != nil {
+		return nil, err
+	}
+	offset = offset + uint32(binary.Size(header))
+	buff := bytes.NewReader(data)
+
+	if err := binary.Read(buff, binary.BigEndian, &header); err != nil {
+		return nil, err
+	}
+
+	if header.Tag != certTagPCClientStoredCert {
+		return nil, fmt.Errorf("invalid certificate")
+	}
+
+	var bufSize uint32
+	switch header.CertType {
+	case tcgFullCert:
+		var tag uint16
+		data, err := NVReadValue(rw, certIndex, offset, uint32(binary.Size(tag)), ownAuth)
+		if err != nil {
+			return nil, err
+		}
+		bufSize = uint32(header.CertSize) + offset
+		offset = offset + uint32(binary.Size(tag))
+		buff = bytes.NewReader(data)
+
+		if err := binary.Read(buff, binary.BigEndian, &tag); err != nil {
+			return nil, err
+		}
+
+		if tag != certTagPCClientFullCert {
+			return nil, fmt.Errorf("certificate type and tag do not match")
+		}
+	case tcgPartialSmallCert:
+		return nil, fmt.Errorf("certType is not TCG_FULL_CERT: currently do not support partial certs")
+	default:
+		return nil, fmt.Errorf("invalid certType: 0x%x", header.CertType)
+	}
+
+	var ekbuf []byte
+	for offset < bufSize {
+		length := bufSize - offset
+		// TPMs can only read so much memory per command so we read in 128byte chunks.
+		// 128 was taken from go-tspi. The actual max read seems to be platform dependent
+		// but cannot be queried on TPM1.2 (and does not seem to appear in any documentation).
+		if length > 128 {
+			length = 128
+		}
+		data, err = NVReadValue(rw, certIndex, offset, length, ownAuth)
+		if err != nil {
+			return nil, err
+		}
+
+		ekbuf = append(ekbuf, data...)
+		offset += length
+	}
+
+	return ekbuf, nil
+}
+
+// NVReadValue returns the value from a given index, offset, and length in NVRAM.
+// See TPM-Main-Part-2-TPM-Structures 19.1.
+func NVReadValue(rw io.ReadWriter, index, offset, len uint32, ownAuth digest) ([]byte, error) {
+	sharedSecretOwn, osaprOwn, err := newOSAPSession(rw, etOwner, khOwner, ownAuth[:])
+	if err != nil {
+		return nil, fmt.Errorf("failed to start new auth session: %v", err)
+	}
+	defer osaprOwn.Close(rw)
+	defer zeroBytes(sharedSecretOwn[:])
+	authIn := []interface{}{ordNVReadValue, index, offset, len}
+	ca, err := newCommandAuth(osaprOwn.AuthHandle, osaprOwn.NonceEven, sharedSecretOwn[:], authIn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct owner auth fields: %v", err)
+	}
+	data, ra, ret, err := nvReadValue(rw, index, offset, len, ca)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read from NVRAM: %v", err)
+	}
+	raIn := []interface{}{ret, ordNVReadValue, tpmutil.U32Bytes(data)}
+	if err := ra.verify(ca.NonceOdd, sharedSecretOwn[:], raIn); err != nil {
+		return nil, fmt.Errorf("failed to verify authenticity of response: %v", err)
+	}
+	return data, nil
+}
+
 // OwnerReadPubEK uses owner auth to get a blob representing the public part of the
 // endorsement key.
 func OwnerReadPubEK(rw io.ReadWriter, ownerAuth digest) ([]byte, error) {
@@ -752,6 +968,11 @@ func ReadPubEK(rw io.ReadWriter) ([]byte, error) {
 	}
 
 	return tpmutil.Pack(pk)
+}
+
+// GetManufacturer returns the manufacturer ID
+func GetManufacturer(rw io.ReadWriter) ([]byte, error) {
+	return getCapability(rw, capProperty, tpmCapPropManufacturer)
 }
 
 // OwnerClear uses owner auth to clear the TPM. After this operation, the TPM
@@ -818,7 +1039,7 @@ func TakeOwnership(rw io.ReadWriter, newOwnerAuth digest, newSRKAuth digest, pub
 	// - Sig must be None
 	// - Key usage must be Storage
 	// - Key must not be migratable
-	srkRSAParams := rsaKeyParms{
+	srkRSAParams := rsaKeyParams{
 		KeyLength: 2048,
 		NumPrimes: 2,
 	}
@@ -826,18 +1047,18 @@ func TakeOwnership(rw io.ReadWriter, newOwnerAuth digest, newSRKAuth digest, pub
 	if err != nil {
 		return err
 	}
-	srkParams := keyParms{
+	srkParams := keyParams{
 		AlgID:     algRSA,
 		EncScheme: esRSAEsOAEPSHA1MGF1,
 		SigScheme: ssNone,
-		Parms:     srkpb,
+		Params:    srkpb,
 	}
 	srk := &key{
-		Version:        0x01010000,
-		KeyUsage:       keyStorage,
-		KeyFlags:       0,
-		AuthDataUsage:  authAlways,
-		AlgorithmParms: srkParams,
+		Version:         0x01010000,
+		KeyUsage:        keyStorage,
+		KeyFlags:        0,
+		AuthDataUsage:   authAlways,
+		AlgorithmParams: srkParams,
 	}
 
 	// Get command auth using OIAP with the new owner auth.
@@ -899,7 +1120,7 @@ func CreateWrapKey(rw io.ReadWriter, srkAuth []byte, usageAuth digest, migration
 		encMigrationAuth[i] = encAuthDataKey[i] ^ migrationAuth[i]
 	}
 
-	rParams := rsaKeyParms{
+	rParams := rsaKeyParams{
 		KeyLength: 2048,
 		NumPrimes: 2,
 	}
@@ -925,11 +1146,11 @@ func CreateWrapKey(rw io.ReadWriter, srkAuth []byte, usageAuth digest, migration
 		KeyUsage:      keySigning,
 		KeyFlags:      0,
 		AuthDataUsage: authAlways,
-		AlgorithmParms: keyParms{
+		AlgorithmParams: keyParams{
 			AlgID:     algRSA,
 			EncScheme: esNone,
 			SigScheme: ssRSASaPKCS1v15DER,
-			Parms:     rParamsPacked,
+			Params:    rParamsPacked,
 		},
 		PCRInfo: pcrInfoBytes,
 	}
@@ -988,7 +1209,7 @@ func Sign(rw io.ReadWriter, keyAuth []byte, keyHandle tpmutil.Handle, hash crypt
 	defer osapr.Close(rw)
 	defer zeroBytes(sharedSecret[:])
 
-	authIn := []interface{}{ordSign, data}
+	authIn := []interface{}{ordSign, tpmutil.U32Bytes(data)}
 	ca, err := newCommandAuth(osapr.AuthHandle, osapr.NonceEven, sharedSecret[:], authIn)
 	if err != nil {
 		return nil, err
@@ -999,7 +1220,7 @@ func Sign(rw io.ReadWriter, keyAuth []byte, keyHandle tpmutil.Handle, hash crypt
 		return nil, err
 	}
 
-	raIn := []interface{}{ret, ordSign, signature}
+	raIn := []interface{}{ret, ordSign, tpmutil.U32Bytes(signature)}
 	err = ra.verify(ca.NonceOdd, sharedSecret[:], raIn)
 	if err != nil {
 		return nil, err

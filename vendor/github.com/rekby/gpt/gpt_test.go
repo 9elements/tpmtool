@@ -30,7 +30,7 @@ func (this *randomWriteBuffer) Seek(offset int64, whence int) (newOffset int64, 
 	return int64(this.offset), nil
 }
 
-func (this*randomWriteBuffer) Write(p []byte) (n int, err error){
+func (this *randomWriteBuffer) Write(p []byte) (n int, err error) {
 	needLen := this.offset + len(p)
 	if needLen > len(this.buf) {
 		newBuf := make([]byte, needLen)
@@ -41,7 +41,6 @@ func (this*randomWriteBuffer) Write(p []byte) (n int, err error){
 	this.offset += len(p)
 	return len(p), nil
 }
-
 
 func TestHeaderRead(t *testing.T) {
 	reader := bytes.NewReader(GPT_TEST_HEADER)
@@ -195,7 +194,7 @@ func TestReadWriteTable(t *testing.T) {
 	}
 }
 
-func TestTableCreateOtherSide(t *testing.T){
+func TestTableCreateOtherSide(t *testing.T) {
 	buf := make([]byte, 512+512+32*512)
 	copy(buf[512:], GPT_TEST_HEADER)
 	copy(buf[1024:], GPT_TEST_ENTRIES)
@@ -237,7 +236,7 @@ func TestTableCreateOtherSide(t *testing.T){
 	if t2.Header.DiskGUID != t1.Header.DiskGUID {
 		t.Error("disk guid")
 	}
-	if t2.Header.PartitionsTableStartLBA != t2.Header.LastUsableLBA + 1{
+	if t2.Header.PartitionsTableStartLBA != t2.Header.LastUsableLBA+1 {
 		t.Error("partitions table start")
 	}
 	if t2.Header.PartitionsArrLen != t1.Header.PartitionsArrLen {
@@ -253,7 +252,7 @@ func TestTableCreateOtherSide(t *testing.T){
 		t.Error("trailing bytes aren't equal")
 	}
 
-	if len(t1.Partitions) != len(t2.Partitions){
+	if len(t1.Partitions) != len(t2.Partitions) {
 		t.Fatal("partitions len are different")
 	}
 
@@ -285,7 +284,7 @@ func TestTableCreateOtherSide(t *testing.T){
 	}
 }
 
-func TestTableCopy(t *testing.T){
+func TestTableCopy(t *testing.T) {
 	buf := make([]byte, 512+512+32*512)
 	copy(buf[512:], GPT_TEST_HEADER)
 	copy(buf[1024:], GPT_TEST_ENTRIES)
@@ -346,11 +345,11 @@ func TestTableCopy(t *testing.T){
 		t.Error("trailing bytes aren't equal")
 	}
 	t1.Header.TrailingBytes[0] += 1
-	if t1.Header.TrailingBytes[0] == t2.Header.TrailingBytes[0]{
+	if t1.Header.TrailingBytes[0] == t2.Header.TrailingBytes[0] {
 		t.Error("same trailing bytes")
 	}
 
-	if len(t1.Partitions) != len(t2.Partitions){
+	if len(t1.Partitions) != len(t2.Partitions) {
 		t.Fatal("partitions len are different")
 	}
 
@@ -386,7 +385,7 @@ func TestTableCopy(t *testing.T){
 	}
 }
 
-func TestTableNewSize(t *testing.T){
+func TestTableNewSize(t *testing.T) {
 	buf := make([]byte, 512+512+32*512)
 	copy(buf[512:], GPT_TEST_HEADER)
 	copy(buf[1024:], GPT_TEST_ENTRIES)
@@ -447,11 +446,11 @@ func TestTableNewSize(t *testing.T){
 		t.Error("trailing bytes aren't equal")
 	}
 	t1.Header.TrailingBytes[0] += 1
-	if t1.Header.TrailingBytes[0] == t2.Header.TrailingBytes[0]{
+	if t1.Header.TrailingBytes[0] == t2.Header.TrailingBytes[0] {
 		t.Error("same trailing bytes")
 	}
 
-	if len(t1.Partitions) != len(t2.Partitions){
+	if len(t1.Partitions) != len(t2.Partitions) {
 		t.Fatal("partitions len are different")
 	}
 
@@ -496,33 +495,32 @@ func TestTableNewSize(t *testing.T){
 	}
 }
 
-
-func TestGuidToString(t *testing.T){
+func TestGuidToString(t *testing.T) {
 	guid := [...]byte{40, 115, 42, 193, 31, 248, 210, 17, 186, 75, 0, 160, 201, 62, 201, 59}
 	guidS := guidToString(guid)
 	if guidS != "C12A7328-F81F-11D2-BA4B-00A0C93EC93B" {
-		t.Errorf("Error guid: %v != %v", guidS,  "C12A7328-F81F-11D2-BA4B-00A0C93EC93B")
+		t.Errorf("Error guid: %v != %v", guidS, "C12A7328-F81F-11D2-BA4B-00A0C93EC93B")
 	}
 }
 
-func TestStringToGuid(t *testing.T){
-	guid, err := stringToGuid( "C12A7328-F81F-11D2-BA4B-00A0C93EC93B")
+func TestStringToGuid(t *testing.T) {
+	guid, err := StringToGuid("C12A7328-F81F-11D2-BA4B-00A0C93EC93B")
 	if err != nil {
 		t.Error(err)
 	}
 	if guid != [...]byte{40, 115, 42, 193, 31, 248, 210, 17, 186, 75, 0, 160, 201, 62, 201, 59} {
-		t.Errorf("Bad result. Expected:\n%v\nResult:\n%v", [...]byte{40, 115, 42, 193, 31, 248, 210, 17, 186, 75, 0, 160, 201, 62, 201, 59}, guid )
+		t.Errorf("Bad result. Expected:\n%v\nResult:\n%v", [...]byte{40, 115, 42, 193, 31, 248, 210, 17, 186, 75, 0, 160, 201, 62, 201, 59}, guid)
 	}
-	if _, err := stringToGuid(""); err == nil {
+	if _, err := StringToGuid(""); err == nil {
 		t.Error("Must return error")
 	}
-	if _, err := stringToGuid("C12A7328-F81F-11D2-BA4B-00A0C93EC93BA"); err == nil {
+	if _, err := StringToGuid("C12A7328-F81F-11D2-BA4B-00A0C93EC93BA"); err == nil {
 		t.Error("Must return error")
 	}
-	if _, err := stringToGuid("C12A7328-F81F-11D2-BA4B!00A0C93EC93B"); err == nil {
+	if _, err := StringToGuid("C12A7328-F81F-11D2-BA4B!00A0C93EC93B"); err == nil {
 		t.Error("Must return error")
 	}
-	if _, err := stringToGuid("C12A7328-F81F-11D2-BA4B-00A0C93EC93Z"); err == nil {
+	if _, err := StringToGuid("C12A7328-F81F-11D2-BA4B-00A0C93EC93Z"); err == nil {
 		t.Error("Must return error")
 	}
 }
