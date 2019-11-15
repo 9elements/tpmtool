@@ -158,3 +158,17 @@ const HCRTM string = "HCRTM"
 
 // FirmwareType (BIOS)
 type FirmwareType string
+
+const (
+	// Uefi is an Open Source UEFI implementation, www.tianocore.org
+	Uefi FirmwareType = "UEFI"
+	// Coreboot is an Open Source firmware, www.coreboot.org
+	Coreboot FirmwareType = "coreboot"
+	// UBoot is an Open Source firmware, www.denx.de/wiki/U-Boot
+	UBoot FirmwareType = "U-Boot"
+	// LinuxBoot is an Open Source firmware based on UEFI and a Linux runtime,
+	// www.linuxboot.org
+	LinuxBoot FirmwareType = "LinuxBoot"
+	// Bios is the legacy BIOS
+	Bios FirmwareType = "BIOS"
+)

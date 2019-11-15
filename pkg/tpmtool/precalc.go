@@ -8,8 +8,8 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/9elements/tpmtool/pkg/tpm"
 	"github.com/koding/multiconfig"
-	"github.com/systemboot/tpmtool/pkg/tpm"
 )
 
 // TPMInterface is a global TPM interface
@@ -126,9 +126,9 @@ func MeasurePCR(pcrIndex int, filePath string, algoID tpm.IAlgHash) error {
 }
 
 // FirmwareLogPCR uses the firmware ACPI log for extending PCRs
-func FirmwareLogPCR(pcrIndex int, firmware FirmwareType) error {
+func FirmwareLogPCR(pcrIndex int, firmware tpm.FirmwareType) error {
 	tpmSpec := TPMInterface.Info().Specification
-	tcpaLog, err := tpm.ParseLog(string(firmware), tpmSpec)
+	tcpaLog, err := tpm.ParseLog(firmware, tpmSpec)
 	if err != nil {
 		return err
 	}

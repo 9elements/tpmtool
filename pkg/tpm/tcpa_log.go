@@ -328,7 +328,7 @@ func getEventDataString(eventType uint32, eventData []byte) (*string, error) {
 	return &eventInfo, errors.New("Event type couldn't get parsed")
 }
 
-func readTPM2Log(firmware string) (*PCRLog, error) {
+func readTPM2Log(firmware FirmwareType) (*PCRLog, error) {
 	var pcrLog PCRLog
 	pcrLog.Firmware = firmware
 
@@ -519,7 +519,7 @@ func readTPM2Log(firmware string) (*PCRLog, error) {
 	return &pcrLog, nil
 }
 
-func readTPM1Log(firmware string) (*PCRLog, error) {
+func readTPM1Log(firmware FirmwareType) (*PCRLog, error) {
 	var pcrLog PCRLog
 	pcrLog.Firmware = firmware
 
@@ -672,7 +672,7 @@ func readTPM1Log(firmware string) (*PCRLog, error) {
 }
 
 // ParseLog is a ,..
-func ParseLog(firmware string, tpmSpec string) (*PCRLog, error) {
+func ParseLog(firmware FirmwareType, tpmSpec string) (*PCRLog, error) {
 	var pcrLog *PCRLog
 	var err error
 
