@@ -155,6 +155,6 @@ type PCRDigestInfo struct {
 
 // PCRLog is a generic PCR eventlog structure
 type PCRLog struct {
-	Firmware string
+	Firmware FirmwareType
 	PcrList  []PCRDigestInfo
 }

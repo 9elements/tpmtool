@@ -1,11 +1,15 @@
 package tpmtool
 
+import (
+	"github.com/9elements/tpmtool/pkg/tpm"
+)
+
 // PreCalculation structure
 type PreCalculation struct {
 	Method     CalculateType
 	Hash       string
 	DevicePath string
-	Firmware   FirmwareType
+	Firmware   tpm.FirmwareType
 	Hashes     []string
 	FilePaths  []string
 }

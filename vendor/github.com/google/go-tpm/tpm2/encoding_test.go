@@ -1,4 +1,4 @@
-// Copyright (c) 2018, Google Inc. All rights reserved.
+// Copyright (c) 2018, Google LLC All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,16 +16,56 @@ package tpm2
 
 import (
 	"bytes"
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/hex"
-	"math/big"
 	"reflect"
 	"testing"
 
 	"github.com/google/go-tpm/tpmutil"
 )
+
+var (
+	pcrSelection0   = PCRSelection{Hash: AlgSHA1, PCRs: []int{0}}
+	pcrSelection1   = PCRSelection{Hash: AlgSHA1, PCRs: []int{1}}
+	pcrSelection7   = PCRSelection{Hash: AlgSHA1, PCRs: []int{7}}
+	defaultPassword = "\x01\x02\x03\x04"
+)
+
+func TestEncodeDecodeCreationData(t *testing.T) {
+	parentQualified := tpmutil.Handle(101)
+	cd := CreationData{
+		PCRSelection:  PCRSelection{Hash: AlgSHA1, PCRs: []int{7}},
+		PCRDigest:     []byte{1, 2, 3},
+		Locality:      32,
+		ParentNameAlg: AlgSHA1,
+		ParentName: Name{
+			Digest: &HashValue{
+				Alg:   AlgSHA1,
+				Value: make([]byte, crypto.SHA1.Size()),
+			},
+		},
+		ParentQualifiedName: Name{
+			Handle: &parentQualified,
+		},
+		OutsideInfo: []byte{7, 8, 9},
+	}
+
+	encoded, err := cd.encode()
+	if err != nil {
+		t.Fatalf("error encoding CreationData: %v", err)
+	}
+	decoded, err := DecodeCreationData(encoded)
+	if err != nil {
+		t.Fatalf("error decoding CreationData: %v", err)
+	}
+
+	if !reflect.DeepEqual(*decoded, cd) {
+		t.Errorf("got decoded value:\n%v\nwant:\n%v", decoded, cd)
+	}
+}
 
 func TestDecodeReadPCRs(t *testing.T) {
 	testRespBytes, err := hex.DecodeString("800100000032000000000000001400000001000403800000000000010014427d27fe15f8f69736e02b6007b8f6ea674c0745")
@@ -37,8 +77,24 @@ func TestDecodeReadPCRs(t *testing.T) {
 	}
 }
 
-func TestEncodeDecodeTPMLSelection(t *testing.T) {
-	buf, err := encodeTPMLPCRSelection(pcrSelection)
+func TestSingleEncodeDecodeTPMLSelection(t *testing.T) {
+	buf, err := encodeTPMLPCRSelection(pcrSelection7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := decodeOneTPMLPCRSelection(bytes.NewBuffer(buf))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(got, pcrSelection7) {
+		t.Errorf("after decoding: %+v, before encoding: %+v", got, pcrSelection7)
+	}
+}
+
+func TestMultiArgsEncodeDecodeTPMLSelection(t *testing.T) {
+	multipcrselection := []PCRSelection{pcrSelection0, pcrSelection1, pcrSelection7}
+	buf, err := encodeTPMLPCRSelection(multipcrselection...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,8 +103,8 @@ func TestEncodeDecodeTPMLSelection(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !reflect.DeepEqual(got, pcrSelection) {
-		t.Errorf("after decoding: %+v, before encoding: %+v", got, pcrSelection)
+	if !reflect.DeepEqual(got, multipcrselection) {
+		t.Errorf("after decoding: %+v, before encoding %+v", got, multipcrselection)
 	}
 }
 
@@ -69,12 +125,12 @@ func TestDecodeGetCapability(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	capReported, handles, err := decodeGetCapability(testRespBytes[10:])
+	handles, moreData, err := decodeGetCapability(testRespBytes[10:])
 	if err != nil {
 		t.Fatal(err)
 	}
-	if capReported != CapabilityHandles || len(handles) != 0 {
-		t.Fatalf("got: (%v, %v), want: (%v, %v)", capReported, handles, CapabilityHandles, 0)
+	if len(handles) != 0 || moreData {
+		t.Fatalf("got: (%v, %v), want: (%v, %v)", handles, moreData, 0, false)
 	}
 }
 
@@ -90,7 +146,8 @@ func TestEncodeLoad(t *testing.T) {
 	}
 	privateBlob := testCmdBytes[33:123]
 	publicBlob := testCmdBytes[125:]
-	cmdBytes, err := encodeLoad(tpmutil.Handle(0x80000000), defaultPassword, publicBlob, privateBlob)
+	auth := AuthCommand{Session: HandlePasswordSession, Attributes: AttrContinueSession, Auth: []byte(defaultPassword)}
+	cmdBytes, err := encodeLoad(tpmutil.Handle(0x80000000), auth, publicBlob, privateBlob)
 	if err != nil {
 		t.Fatalf("encodeLoad failed %s", err)
 	}
@@ -111,26 +168,26 @@ func TestDecodeLoad(t *testing.T) {
 }
 
 func TestEncodeCreate(t *testing.T) {
-	testCmdBytes, err := hex.DecodeString("80020000004d00000131400000010000000940000009000001000000080004010203040000001a0001000400030072000000060080004300100400000100010000000000000001000403800000")
+	testCmdBytes, err := hex.DecodeString("80020000004d00000131400000010000000940000009000001000000090004010203040001FF001a0001000400030072000000060080004300100400000100010000000000000001000403800000")
 	if err != nil {
 		t.Fatal(err)
 	}
 	params := Public{
 		Type:       AlgRSA,
 		NameAlg:    AlgSHA1,
-		Attributes: 0x00030072,
+		Attributes: FlagStorageDefault,
 		RSAParameters: &RSAParams{
 			Symmetric: &SymScheme{
 				Alg:     AlgAES,
 				KeyBits: 128,
 				Mode:    AlgCFB,
 			},
-			KeyBits:  1024,
-			Exponent: uint32(0x00010001),
-			Modulus:  big.NewInt(0),
+			KeyBits:     1024,
+			ExponentRaw: defaultRSAExponent,
 		},
 	}
-	cmdBytes, err := encodeCreate(HandleOwner, pcrSelection, "", defaultPassword, params)
+	auth := AuthCommand{Session: HandlePasswordSession, Attributes: AttrContinueSession}
+	cmdBytes, err := encodeCreate(HandleOwner, pcrSelection7, auth, defaultPassword, []byte{255} /*sensitiveData*/, params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +211,7 @@ func TestDecodeCreatePrimary(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, _, err = decodeCreatePrimary(testRespBytes[10:]); err != nil {
+	if _, _, _, _, _, _, err = decodeCreatePrimary(testRespBytes[10:]); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -164,7 +221,7 @@ func TestEncodePolicyPCR(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmdBytes, err := encodePolicyPCR(tpmutil.Handle(0x03000000), []byte(nil), pcrSelection)
+	cmdBytes, err := encodePolicyPCR(tpmutil.Handle(0x03000000), []byte(nil), pcrSelection7)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +241,7 @@ func TestDecodeStartAuthSession(t *testing.T) {
 	}
 }
 
-func TestDecodeCreateKey(t *testing.T) {
+func TestDecodeCreate(t *testing.T) {
 	testRespBytes, err := hex.DecodeString("8002000001ba00000000000001a70076001405f2c6b6035d4" +
 		"fab43fdc2ed0b6544de59ebd07100100e88a20eb9f58f0f13474a8ab6135144f7c" +
 		"49b80f0f1c2f4900458e2c573c94e7d81e413a06031c634890ccf47e6d02762366" +
@@ -203,7 +260,7 @@ func TestDecodeCreateKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, _, err = decodeCreateKey(testRespBytes[10:]); err != nil {
+	if _, _, _, _, _, err = decodeCreate(testRespBytes[10:]); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -213,7 +270,7 @@ func TestEncodeUnseal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmdBytes, err := encodeUnseal(tpmutil.Handle(0x80000001), defaultPassword)
+	cmdBytes, err := encodeUnseal(HandlePasswordSession, tpmutil.Handle(0x80000001), defaultPassword)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -239,7 +296,7 @@ func TestEncodeQuote(t *testing.T) {
 		t.Fatal(err)
 	}
 	toQuote := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf, 0x10}
-	cmdBytes, err := encodeQuote(tpmutil.Handle(0x80000001), defaultPassword, "", toQuote, pcrSelection, 0x0010)
+	cmdBytes, err := encodeQuote(tpmutil.Handle(0x80000001), defaultPassword, "", toQuote, pcrSelection7, 0x0010)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -302,8 +359,8 @@ func TestEncodeEvictControl(t *testing.T) {
 	}
 }
 
-func TestEncodePasswordAuthArea(t *testing.T) {
-	pwAuth, err := encodePasswordAuthArea(defaultPassword)
+func TestEncodeAuthArea(t *testing.T) {
+	pwAuth, err := encodeAuthArea(AuthCommand{Session: HandlePasswordSession, Attributes: AttrContinueSession, Auth: []byte(defaultPassword)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -312,7 +369,7 @@ func TestEncodePasswordAuthArea(t *testing.T) {
 		t.Fatalf("got: %v, want: %v", pwAuth, want)
 	}
 
-	pwAuth, err = encodePasswordAuthArea("")
+	pwAuth, err = encodeAuthArea(AuthCommand{Session: HandlePasswordSession, Attributes: AttrContinueSession, Auth: []byte("")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -334,7 +391,7 @@ func TestEncodeSensitiveArea(t *testing.T) {
 }
 
 func TestEncodeTPMLPCRSelection(t *testing.T) {
-	s, err := encodeTPMLPCRSelection(pcrSelection)
+	s, err := encodeTPMLPCRSelection(pcrSelection7)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -355,7 +412,7 @@ func TestECCParamsEncodeDecode(t *testing.T) {
 			Hash: AlgSHA1,
 		},
 		CurveID: CurveNISTP256,
-		Point:   ECPoint{X: pk.PublicKey.X, Y: pk.PublicKey.Y},
+		Point:   ECPoint{XRaw: pk.PublicKey.X.Bytes(), YRaw: pk.PublicKey.Y.Bytes()},
 	}
 
 	buf, err := params.encode()
@@ -365,6 +422,19 @@ func TestECCParamsEncodeDecode(t *testing.T) {
 	got, err := decodeECCParams(bytes.NewBuffer(buf))
 	if err != nil {
 		t.Fatalf("decodeECCParams: %v", err)
+	}
+
+	if params.Point.X().Cmp(pk.PublicKey.X) != 0 {
+		t.Fatalf("the deserialized X(big.Int) from ECCParams didn't match the X(Int) generated by ecdsa. got: %+v\nwant: %+v", params.Point.X(), pk.PublicKey.X)
+	}
+	if params.Point.Y().Cmp(pk.PublicKey.Y) != 0 {
+		t.Fatalf("the deserialized Y(big.Int) from ECCParams didn't match the Y(Int) generated by ecdsa. got: %+v\nwant: %+v", params.Point.Y(), pk.PublicKey.Y)
+	}
+	if params.Point.X().Cmp(got.Point.X()) != 0 {
+		t.Fatalf("the deserialized X(big.Int) from ECCParams after encode/decode didn't match the X(big.Int) before. got: %+v\nwant: %+v", got.Point.X(), params.Point.X())
+	}
+	if params.Point.Y().Cmp(got.Point.Y()) != 0 {
+		t.Fatalf("the deserialized Y(big.Int) from ECCParams after encode/decode didn't match the Y(big.Int) before. got: %+v\nwant: %+v", got.Point.Y(), params.Point.Y())
 	}
 
 	if !reflect.DeepEqual(got, params) {

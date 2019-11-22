@@ -11,9 +11,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/systemboot/systemboot/pkg/storage"
-	"github.com/systemboot/tpmtool/pkg/tpm"
-	"github.com/systemboot/tpmtool/pkg/tpmtool"
+	"github.com/9elements/tpmtool/pkg/tpm"
+	"github.com/9elements/tpmtool/pkg/tpmtool"
+	"github.com/u-root/u-root/pkg/storage"
 )
 
 const (
@@ -329,16 +329,16 @@ func EventlogDump() error {
 		tpm.DefaultTCPABinaryLog = *eventlogDumpFile
 	}
 
-	var firmware tpmtool.FirmwareType
+	var firmware tpm.FirmwareType
 	if *eventlogDumpFirmwareUefi {
-		firmware = tpmtool.Uefi
+		firmware = tpm.Uefi
 	} else if *eventlogDumpFirmwareBios {
-		firmware = tpmtool.Bios
+		firmware = tpm.Bios
 	} else {
 		if _, err := os.Stat(LinuxEFIFirmwareDir); os.IsNotExist(err) {
-			firmware = tpmtool.Uefi
+			firmware = tpm.Uefi
 		} else {
-			firmware = tpmtool.Bios
+			firmware = tpm.Bios
 		}
 	}
 
@@ -348,7 +348,7 @@ func EventlogDump() error {
 		TPMSpecVersion = tpm.TPM20
 	}
 
-	tcpaLog, err := tpm.ParseLog(string(firmware), TPMSpecVersion)
+	tcpaLog, err := tpm.ParseLog(firmware, TPMSpecVersion)
 	if err != nil {
 		return err
 	}

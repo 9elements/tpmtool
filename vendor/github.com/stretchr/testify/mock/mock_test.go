@@ -32,6 +32,7 @@ func (i *TestExampleImplementation) TheExampleMethod(a, b, c int) (int, error) {
 	return args.Int(0), errors.New("Whoops")
 }
 
+//go:noinline
 func (i *TestExampleImplementation) TheExampleMethod2(yesorno bool) {
 	i.Called(yesorno)
 }
@@ -739,6 +740,16 @@ func Test_Mock_findExpectedCall_Respects_Repeatability(t *testing.T) {
 		}
 	}
 
+	c = m.On("Once", 1).Return("one").Once()
+	c.Repeatability = -1
+	f, c = m.findExpectedCall("Once", 1)
+	if assert.Equal(t, -1, f) {
+		if assert.NotNil(t, c) {
+			assert.Equal(t, "Once", c.Method)
+			assert.Equal(t, 1, c.Arguments[0])
+			assert.Equal(t, "one", c.ReturnArguments[0])
+		}
+	}
 }
 
 func Test_callString(t *testing.T) {
@@ -1492,6 +1503,7 @@ func unexpectedCallRegex(method, calledArg, expectedArg, diff string) string {
 		rMethod, calledArg, rMethod, expectedArg, diff)
 }
 
+//go:noinline
 func ConcurrencyTestMethod(m *Mock) {
 	m.Called()
 }

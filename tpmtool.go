@@ -4,7 +4,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/systemboot/tpmtool/pkg/tpm"
+	"github.com/9elements/tpmtool/pkg/tpm"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
