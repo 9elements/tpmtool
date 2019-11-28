@@ -153,6 +153,9 @@ func (e *TcgPcrEvent) PcrEventName() string {
 	if EFILogTypes[EFILogID(e.eventType)] != "" {
 		return EFILogTypes[EFILogID(e.eventType)]
 	}
+	if TxtLogTypes[TxtLogID(e.eventType)] != "" {
+		return TxtLogTypes[TxtLogID(e.eventType)]
+	}
 
 	return ""
 }
@@ -244,6 +247,9 @@ func (e *TcgPcrEvent2) PcrEventName() string {
 	if EFILogTypes[EFILogID(e.eventType)] != "" {
 		return EFILogTypes[EFILogID(e.eventType)]
 	}
+	if TxtLogTypes[TxtLogID(e.eventType)] != "" {
+		return TxtLogTypes[TxtLogID(e.eventType)]
+	}
 
 	return ""
 }
@@ -296,4 +302,38 @@ func (e *TcgPcrEvent2) String() string {
 	}
 
 	return b.String()
+}
+
+func readTxtEventLogContainer(handle io.Reader) (*TxtEventLogContainer, error) {
+	var container TxtEventLogContainer
+
+	if err := binary.Read(handle, binary.LittleEndian, &container.Signature); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(handle, binary.LittleEndian, &container.Reserved); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(handle, binary.LittleEndian, &container.ContainerVerMajor); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(handle, binary.LittleEndian, &container.ContainerVerMinor); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(handle, binary.LittleEndian, &container.PcrEventVerMajor); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(handle, binary.LittleEndian, &container.PcrEventVerMinor); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(handle, binary.LittleEndian, &container.Size); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(handle, binary.LittleEndian, &container.PcrEventsOffset); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(handle, binary.LittleEndian, &container.NextEventOffset); err != nil {
+		return nil, err
+	}
+
+	return &container, nil
 }
