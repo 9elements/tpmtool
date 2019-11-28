@@ -145,14 +145,6 @@ type PCRDigestValue struct {
 	Digest    []byte
 }
 
-// PCRDigestInfo is the info about the measurements
-type PCRDigestInfo struct {
-	PcrIndex     int
-	PcrEventName string
-	PcrEventData string
-	Digests      []PCRDigestValue
-}
-
 // PCREvent is a common interface for TcgPcrEvent & TcgPcrEvent2
 type PCREvent interface {
 	PcrIndex() int
@@ -166,5 +158,5 @@ type PCREvent interface {
 // PCRLog is a generic PCR eventlog structure
 type PCRLog struct {
 	Firmware FirmwareType
-	PcrList  []PCRDigestInfo
+	PcrList  []PCREvent
 }
