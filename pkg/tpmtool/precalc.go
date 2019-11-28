@@ -134,10 +134,13 @@ func FirmwareLogPCR(pcrIndex int, firmware tpm.FirmwareType) error {
 	}
 
 	for _, event := range tcpaLog.PcrList {
-		if event.PcrIndex == pcrIndex {
-			for _, digest := range event.Digests {
-				if event.PcrIndex == pcrIndex {
-					err := ExtendPCR(event.PcrIndex, digest.Digest, digest.DigestAlg)
+		if event.PcrEventType() == uint32(tpm.EvNoAction) {
+			continue
+		}
+		if event.PcrIndex() == pcrIndex {
+			for _, digest := range *event.Digests() {
+				if event.PcrIndex() == pcrIndex {
+					err := ExtendPCR(event.PcrIndex(), digest.Digest, digest.DigestAlg)
 					if err != nil {
 						return err
 					}
