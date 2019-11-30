@@ -159,4 +159,20 @@ type PCREvent interface {
 type PCRLog struct {
 	Firmware FirmwareType
 	PcrList  []PCREvent
+
+}
+// [2] http://kib.kiev.ua/x86docs/SDMs/315168-011.pdf (Pre-TrEE MLE Guide)
+// [3] https://www.intel.com/content/dam/www/public/us/en/documents/guides/intel-txt-software-development-guide.pdf
+
+// TxtEventLogContainer is log header for TPM1.2 TXT log
+type TxtEventLogContainer struct {
+	Signature         [20]uint8
+	Reserved          [12]uint8
+	ContainerVerMajor uint8
+	ContainerVerMinor uint8
+	PcrEventVerMajor  uint8
+	PcrEventVerMinor  uint8
+	Size              uint32
+	PcrEventsOffset   uint32
+	NextEventOffset   uint32
 }

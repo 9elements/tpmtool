@@ -383,15 +383,47 @@ func readTPM1Log(firmware FirmwareType) (*PCRLog, error) {
 
 	pcrLog.Firmware = firmware
 
-	for {
-		pcrEvent, err := parseTcgPcrEvent(file)
-		if err == io.EOF {
-			break
-		} else if err != nil {
+	if firmware == "TXT" {
+		var pcrLog PCRLog
+
+		container, err := readTxtEventLogContainer(file)
+		if err != nil {
 			return nil, err
 		}
 
-		pcrLog.PcrList = append(pcrLog.PcrList, pcrEvent)
+		// seek to first PCR event
+		file.Seek(int64(container.PcrEventsOffset), os.SEEK_SET)
+
+		for {
+			offset, err := file.Seek(0, os.SEEK_CUR)
+			if err != nil {
+				return nil, err
+			}
+
+			if offset >= int64(container.NextEventOffset) {
+				break
+			}
+
+			pcrEvent, err := parseTcgPcrEvent(file)
+			if err != nil {
+				// NB: error out even for EOF because it should
+				//     not be seen before NextEventOffset
+				return nil, err
+			}
+
+			pcrLog.PcrList = append(pcrLog.PcrList, pcrEvent)
+		}
+	} else {
+		for {
+			pcrEvent, err := parseTcgPcrEvent(file)
+			if err == io.EOF {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+
+			pcrLog.PcrList = append(pcrLog.PcrList, pcrEvent)
+		}
 	}
 
 	return &pcrLog, nil

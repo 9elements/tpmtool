@@ -334,6 +334,8 @@ func EventlogDump() error {
 		firmware = tpm.Uefi
 	} else if *eventlogDumpFirmwareBios {
 		firmware = tpm.Bios
+	} else if *eventlogDumpFirmwareTxt {
+		firmware = tpm.Txt
 	} else {
 		if _, err := os.Stat(LinuxEFIFirmwareDir); os.IsNotExist(err) {
 			firmware = tpm.Uefi

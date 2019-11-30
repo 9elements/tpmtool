@@ -98,6 +98,7 @@ var (
 	eventlogDump             = eventlog.Command("dump", "Dump the eventlog")
 	eventlogDumpFirmwareUefi = eventlogDump.Flag("uefi", "Set UEFI firmware").Bool()
 	eventlogDumpFirmwareBios = eventlogDump.Flag("bios", "Set BIOS firmware").Bool()
+	eventlogDumpFirmwareTxt  = eventlogDump.Flag("txt", "Set Intel TXT launch").Bool()
 	eventlogDumpTPMSpec1     = eventlogDump.Flag("tpm12", "Set tpm12 specification").Bool()
 	eventlogDumpTPMSpec2     = eventlogDump.Flag("tpm20", "Set tpm20 specification").Bool()
 	eventlogDumpFile         = eventlogDump.Arg("log", "Custom eventlog file path").String()
