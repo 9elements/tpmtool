@@ -3,6 +3,7 @@ package tpm
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -456,7 +457,13 @@ func ParseLog(firmware FirmwareType, tpmSpec string) (*PCRLog, error) {
 	return pcrLog, nil
 }
 
-func DumpLog(tcpaLog *PCRLog) error {
+func DumpLog(tcpaLog *PCRLog, jsonDump bool) error {
+	if jsonDump {
+		log, err := json.MarshalIndent(tcpaLog, "", "  ")
+		fmt.Println(string(log))
+		return err
+	}
+
 	for _, pcr := range tcpaLog.PcrList {
 		fmt.Printf("%s\n", pcr)
 

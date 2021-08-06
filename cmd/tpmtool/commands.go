@@ -355,5 +355,5 @@ func EventlogDump() error {
 		return err
 	}
 
-	return tpm.DumpLog(tcpaLog)
+	return tpm.DumpLog(tcpaLog, *eventlogJson)
 }
