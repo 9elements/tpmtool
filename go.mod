@@ -7,7 +7,7 @@ require (
 	github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d // indirect
 	github.com/fatih/camelcase v1.0.0 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
-	github.com/google/go-tpm v0.2.0
+	github.com/google/go-tpm v0.3.2
 	github.com/koding/multiconfig v0.0.0-20171124222453-69c27309b2d7
 	github.com/rekby/gpt v0.0.0-20190209220743-520ac65554cf
 	github.com/stretchr/testify v1.4.0

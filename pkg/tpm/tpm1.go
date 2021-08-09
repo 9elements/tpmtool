@@ -137,7 +137,7 @@ func (t *TPM1) SealData(locality byte, pcrs []int, data []byte, srkPassword stri
 		srkAuth = sha1.Sum([]byte(srkPassword))
 	}
 
-	sealed, err := tspi.Seal(t.device, locality, pcrs, data, srkAuth[:])
+	sealed, err := tspi.Seal(t.device, tspi.Locality(locality), pcrs, data, srkAuth[:])
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +157,7 @@ func (t *TPM1) ResealData(locality byte, pcrInfo map[int][]byte, data []byte, sr
 		srkAuth = sha1.Sum([]byte(srkPassword))
 	}
 
-	sealed, err := tspi.Reseal(t.device, locality, pcrInfo, data, srkAuth[:])
+	sealed, err := tspi.Reseal(t.device, tspi.Locality(locality), pcrInfo, data, srkAuth[:])
 	if err != nil {
 		return nil, err
 	}
