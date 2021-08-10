@@ -357,3 +357,44 @@ func EventlogDump() error {
 
 	return tpm.DumpLog(tcpaLog, *eventlogJson)
 }
+
+// EventlogParse parses the eventlog from an existing dump
+func EventlogParse() error {
+	if *eventlogParseFile != "" {
+		tpm.DefaultTCPABinaryLog = *eventlogParseFile
+	} else {
+		return fmt.Errorf("must provide a TPM event log file")
+	}
+
+	var firmwareType tpm.FirmwareType
+	switch *eventlogParseFirmwareType {
+	case "UEFI":
+		firmwareType = tpm.Uefi
+	case "BIOS":
+		firmwareType = tpm.Bios
+	case "TXT":
+		firmwareType = tpm.Txt
+	default:
+		return fmt.Errorf("provide a valid firmware variant: TXT, BIOS, or UEFI")
+	}
+
+	if *eventlogParseSpec != "" {
+		switch *eventlogParseSpec {
+		case "1.2":
+			TPMSpecVersion = tpm.TPM12
+		case "2.0":
+			TPMSpecVersion = tpm.TPM20
+		default:
+			return fmt.Errorf("provide a valid TPM version: 1.2 or 2.0")
+		}
+	} else {
+		TPMSpecVersion = tpm.TPM20
+	}
+
+	tcpaLog, err := tpm.ParseLog(firmwareType, TPMSpecVersion)
+	if err != nil {
+		return err
+	}
+
+	return tpm.DumpLog(tcpaLog, *eventlogParseJson)
+}
