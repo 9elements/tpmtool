@@ -1,6 +1,9 @@
 package tpm
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"github.com/rekby/gpt"
 )
 
@@ -123,20 +126,47 @@ type TcgBiosSpecIDEvent struct {
 
 // TcgPcrEvent2 is a TPM2 default log structure (EFI only)
 type TcgPcrEvent2 struct {
-	pcrIndex  uint32
+	pcrIndex  uint32 `json:"index"`
 	eventType uint32
 	digests   LDigestValues
 	eventSize uint32
 	event     []byte
 }
 
+func (e *TcgPcrEvent2) MarshalJSON() ([]byte, error) {
+	m := make(map[string]string)
+	m["type"] = e.PcrEventName()
+	d := e.PcrEventData()
+	if d != "" {
+		m["data"] = d
+	}
+	// TODO: This feels a bit hacky. Is it event correct?
+	ds, err := json.Marshal(e.digests)
+	if err != nil {
+		return nil, err
+	}
+	m["digests"] = string(ds)
+	return json.Marshal(m)
+}
+
 // TcgPcrEvent is the TPM1.2 default log structure (BIOS, EFI compatible)
 type TcgPcrEvent struct {
-	pcrIndex  uint32
+	pcrIndex  uint32 `json:"index"`
 	eventType uint32
 	digest    [20]byte
 	eventSize uint32
 	event     []byte
+}
+
+func (e *TcgPcrEvent) MarshalJSON() ([]byte, error) {
+	m := make(map[string]string)
+	m["type"] = e.PcrEventName()
+	d := e.PcrEventData()
+	if d != "" {
+		m["data"] = d
+	}
+	m["digest"] = fmt.Sprintf("%x", e.digest)
+	return json.Marshal(m)
 }
 
 // PCRDigestValue is the hash and algorithm
@@ -159,8 +189,8 @@ type PCREvent interface {
 type PCRLog struct {
 	Firmware FirmwareType
 	PcrList  []PCREvent
-
 }
+
 // [2] http://kib.kiev.ua/x86docs/SDMs/315168-011.pdf (Pre-TrEE MLE Guide)
 // [3] https://www.intel.com/content/dam/www/public/us/en/documents/guides/intel-txt-software-development-guide.pdf
 
