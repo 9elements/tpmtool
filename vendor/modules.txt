@@ -15,7 +15,7 @@ github.com/fatih/camelcase
 # github.com/fatih/structs v1.1.0
 ## explicit
 github.com/fatih/structs
-# github.com/google/go-tpm v0.2.0
+# github.com/google/go-tpm v0.3.2
 ## explicit
 github.com/google/go-tpm/tpm
 github.com/google/go-tpm/tpmutil
@@ -35,6 +35,9 @@ github.com/stretchr/testify/require
 # github.com/u-root/u-root v6.0.0+incompatible
 ## explicit
 github.com/u-root/u-root/pkg/storage
+# golang.org/x/sys v0.0.0-20201207223542-d4d67f95c62d
+golang.org/x/sys/internal/unsafeheader
+golang.org/x/sys/unix
 # gopkg.in/alecthomas/kingpin.v2 v2.2.6
 ## explicit
 gopkg.in/alecthomas/kingpin.v2
