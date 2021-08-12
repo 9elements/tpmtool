@@ -102,6 +102,7 @@ var (
 	eventlogDumpTPMSpec1     = eventlogDump.Flag("tpm12", "Set tpm12 specification").Bool()
 	eventlogDumpTPMSpec2     = eventlogDump.Flag("tpm20", "Set tpm20 specification").Bool()
 	eventlogDumpFile         = eventlogDump.Arg("log", "Custom eventlog file path").String()
+	eventlogJson             = eventlogDump.Flag("json", "Output in JSON format").Bool()
 )
 
 func main() {
