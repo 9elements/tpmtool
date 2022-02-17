@@ -20,7 +20,7 @@ const (
 	// MaxPlatformConfigurationRegister is the maximum number of PCRs
 	MaxPlatformConfigurationRegister = 24
 	// DefaultFilePermissions is the default write permission
-	DefaultFilePermissions = 660
+	DefaultFilePermissions = 0660
 	// LinuxEFIFirmwareDir is the UEFI linux firmware directory
 	LinuxEFIFirmwareDir = "/sys/firmware/efi"
 	// Delay is used for sealing operations delay
@@ -56,7 +56,7 @@ func Ek() error {
 	}
 
 	if *ekCommandOutfile != "" {
-		if err := ioutil.WriteFile(*ekCommandOutfile, pubEk, 660); err != nil {
+		if err := ioutil.WriteFile(*ekCommandOutfile, pubEk, DefaultFilePermissions); err != nil {
 			return err
 		}
 	}
@@ -120,7 +120,7 @@ func CryptoSeal() error {
 		return err
 	}
 
-	return ioutil.WriteFile(*cryptoCommandSealCipherFile, sealed, 660)
+	return ioutil.WriteFile(*cryptoCommandSealCipherFile, sealed, DefaultFilePermissions)
 }
 
 // CryptoUnseal unseals data by the TPM against PCR
@@ -138,7 +138,7 @@ func CryptoUnseal() error {
 		return err
 	}
 
-	return ioutil.WriteFile(*cryptoCommandUnsealPlainFile, unsealed, 660)
+	return ioutil.WriteFile(*cryptoCommandUnsealPlainFile, unsealed, DefaultFilePermissions)
 }
 
 // CryptoReseal reseals a data by given sealing configuration
@@ -166,7 +166,7 @@ func CryptoReseal() error {
 		return err
 	}
 
-	return ioutil.WriteFile(*cryptoCommandResealKeyfile, sealed, 660)
+	return ioutil.WriteFile(*cryptoCommandResealKeyfile, sealed, DefaultFilePermissions)
 }
 
 // PcrList dumps all PCRs
@@ -235,7 +235,7 @@ func DiskFormat() error {
 		return err
 	}
 
-	if err = ioutil.WriteFile(keystorePath+"/plain", randBytes, 660); err != nil {
+	if err = ioutil.WriteFile(keystorePath+"/plain", randBytes, DefaultFilePermissions); err != nil {
 		return err
 	}
 
@@ -253,7 +253,7 @@ func DiskFormat() error {
 		return err
 	}
 
-	return ioutil.WriteFile(*diskCommandFormatFile, sealed, 660)
+	return ioutil.WriteFile(*diskCommandFormatFile, sealed, DefaultFilePermissions)
 }
 
 // DiskOpen opens a LUKS device
@@ -281,7 +281,7 @@ func DiskOpen() error {
 		return err
 	}
 
-	if err = ioutil.WriteFile(keystorePath+"/plain", sealed, 660); err != nil {
+	if err = ioutil.WriteFile(keystorePath+"/plain", sealed, DefaultFilePermissions); err != nil {
 		return err
 	}
 
@@ -356,4 +356,45 @@ func EventlogDump() error {
 	}
 
 	return tpm.DumpLog(tcpaLog, *eventlogJson)
+}
+
+// EventlogParse parses the eventlog from an existing dump
+func EventlogParse() error {
+	if *eventlogParseFile != "" {
+		tpm.DefaultTCPABinaryLog = *eventlogParseFile
+	} else {
+		return fmt.Errorf("must provide a TPM event log file")
+	}
+
+	var firmwareType tpm.FirmwareType
+	switch *eventlogParseFirmwareType {
+	case "UEFI":
+		firmwareType = tpm.Uefi
+	case "BIOS":
+		firmwareType = tpm.Bios
+	case "TXT":
+		firmwareType = tpm.Txt
+	default:
+		return fmt.Errorf("provide a valid firmware variant: TXT, BIOS, or UEFI")
+	}
+
+	if *eventlogParseSpec != "" {
+		switch *eventlogParseSpec {
+		case "1.2":
+			TPMSpecVersion = tpm.TPM12
+		case "2.0":
+			TPMSpecVersion = tpm.TPM20
+		default:
+			return fmt.Errorf("provide a valid TPM version: 1.2 or 2.0")
+		}
+	} else {
+		TPMSpecVersion = tpm.TPM20
+	}
+
+	tcpaLog, err := tpm.ParseLog(firmwareType, TPMSpecVersion)
+	if err != nil {
+		return err
+	}
+
+	return tpm.DumpLog(tcpaLog, *eventlogParseJson)
 }

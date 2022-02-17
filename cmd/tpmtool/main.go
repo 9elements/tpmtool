@@ -94,20 +94,34 @@ var (
 	diskCommandExtendDevice = diskCommandExtend.Arg("device", "Device which should be encrypted").Required().String()
 	diskCommandExtendPcr    = diskCommandExtend.Flag("pcr", "Set the PCR for the measurement operation").Required().Uint32()
 
-	eventlog                 = kingpin.Command("eventlog", "TPM eventlog operation")
-	eventlogDump             = eventlog.Command("dump", "Dump the eventlog")
-	eventlogDumpFirmwareUefi = eventlogDump.Flag("uefi", "Set UEFI firmware").Bool()
-	eventlogDumpFirmwareBios = eventlogDump.Flag("bios", "Set BIOS firmware").Bool()
-	eventlogDumpFirmwareTxt  = eventlogDump.Flag("txt", "Set Intel TXT launch").Bool()
-	eventlogDumpTPMSpec1     = eventlogDump.Flag("tpm12", "Set tpm12 specification").Bool()
-	eventlogDumpTPMSpec2     = eventlogDump.Flag("tpm20", "Set tpm20 specification").Bool()
-	eventlogDumpFile         = eventlogDump.Arg("log", "Custom eventlog file path").String()
-	eventlogJson             = eventlogDump.Flag("json", "Output in JSON format").Bool()
+	eventlog                  = kingpin.Command("eventlog", "TPM eventlog operation")
+	eventlogDump              = eventlog.Command("dump", "Dump the eventlog")
+	eventlogDumpFirmwareUefi  = eventlogDump.Flag("uefi", "Set UEFI firmware").Bool()
+	eventlogDumpFirmwareBios  = eventlogDump.Flag("bios", "Set BIOS firmware").Bool()
+	eventlogDumpFirmwareTxt   = eventlogDump.Flag("txt", "Set Intel TXT launch").Bool()
+	eventlogDumpTPMSpec1      = eventlogDump.Flag("tpm12", "Set tpm12 specification").Bool()
+	eventlogDumpTPMSpec2      = eventlogDump.Flag("tpm20", "Set tpm20 specification").Bool()
+	eventlogDumpFile          = eventlogDump.Arg("log", "Custom eventlog file path").String()
+	eventlogJson              = eventlogDump.Flag("json", "Output in JSON format").Bool()
+	eventlogParse             = eventlog.Command("parse", "Parse the eventlog from a file")
+	eventlogParseFirmwareType = eventlogParse.Flag("type", "Set firmware type: BIOS, UEFI, or TXT").Required().String()
+	eventlogParseSpec         = eventlogParse.Flag("spec", "Set TPM specification version, 1.2 or 2.0, defaulting to 2.0").String()
+	eventlogParseFile         = eventlogParse.Arg("log", "Eventlog file path").Required().String()
+	eventlogParseJson         = eventlogParse.Flag("json", "Output in JSON format").Bool()
 )
 
 func main() {
 	kingpin.UsageTemplate(kingpin.CompactUsageTemplate).Version(goversion).Author(Author)
 	kingpin.CommandLine.Help = HelpText
+	cmd := kingpin.Parse()
+
+	// Parsing a dump from an existing file does not require root
+	if cmd == "eventlog parse" {
+		if err := EventlogParse(); err != nil {
+			log.Fatalln(err.Error())
+		}
+		return
+	}
 
 	if *tpmDevice != "" {
 		tpm.TPMDevice = *tpmDevice
@@ -128,7 +142,7 @@ func main() {
 
 	TPMSpecVersion = TPMInterface.Info().Specification
 
-	switch kingpin.Parse() {
+	switch cmd {
 	case "status":
 		if err := Status(); err != nil {
 			log.Fatalln(err.Error())
