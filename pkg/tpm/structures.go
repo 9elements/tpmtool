@@ -14,7 +14,7 @@ type EFIGuid struct {
 	blockA uint32
 	blockB uint16
 	blockC uint16
-	blockD uint16
+	blockD [2]uint8
 	blockE [6]uint8
 }
 
@@ -126,32 +126,51 @@ type TcgBiosSpecIDEvent struct {
 
 // TcgPcrEvent2 is a TPM2 default log structure (EFI only)
 type TcgPcrEvent2 struct {
-	pcrIndex  uint32 `json:"index"`
+	pcrIndex  uint32
 	eventType uint32
 	digests   LDigestValues
 	eventSize uint32
 	event     []byte
 }
 
+type mDigest struct {
+	Algorithm string `json:"algorithm"`
+	Digest    string `json:"digest"`
+}
+
 func (e *TcgPcrEvent2) MarshalJSON() ([]byte, error) {
-	m := make(map[string]string)
-	m["type"] = e.PcrEventName()
-	d := e.PcrEventData()
-	if d != "" {
-		m["data"] = d
-	}
-	// TODO: This feels a bit hacky. Is it event correct?
-	ds, err := json.Marshal(e.digests)
+	m := make(map[string]json.RawMessage)
+	j, err := json.Marshal(e.PcrEventName())
 	if err != nil {
 		return nil, err
 	}
-	m["digests"] = string(ds)
+	m["type"] = json.RawMessage(j)
+	d := e.PcrEventData()
+	if d != "" {
+		j, err := json.Marshal(d)
+		if err != nil {
+			return nil, err
+		}
+		m["data"] = json.RawMessage(j)
+	}
+	var ds []mDigest
+	for _, d := range e.digests.digests {
+		ds = append(ds, mDigest{
+			Algorithm: HashAlgoToName[d.hashAlg],
+			Digest:    fmt.Sprintf("%x", d.digest.hash),
+		})
+	}
+	dsj, err := json.Marshal(ds)
+	if err != nil {
+		return nil, err
+	}
+	m["digests"] = json.RawMessage(dsj)
 	return json.Marshal(m)
 }
 
 // TcgPcrEvent is the TPM1.2 default log structure (BIOS, EFI compatible)
 type TcgPcrEvent struct {
-	pcrIndex  uint32 `json:"index"`
+	pcrIndex  uint32
 	eventType uint32
 	digest    [20]byte
 	eventSize uint32
