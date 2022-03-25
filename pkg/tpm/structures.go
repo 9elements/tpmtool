@@ -14,7 +14,7 @@ type EFIGuid struct {
 	blockA uint32
 	blockB uint16
 	blockC uint16
-	blockD uint16
+	blockD [2]uint8
 	blockE [6]uint8
 }
 
