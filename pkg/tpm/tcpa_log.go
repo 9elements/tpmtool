@@ -38,6 +38,15 @@ var HashAlgoToSize = map[IAlgHash]IAlgHashSize{
 	TPMAlgSm3s256: TPMAlgSm3s256Size,
 }
 
+// HashAlgoToName is a map converter for hash to friendly name
+var HashAlgoToName = map[IAlgHash]string{
+	TPMAlgSha:     "SHA1",
+	TPMAlgSha256:  "SHA256",
+	TPMAlgSha384:  "SHA384",
+	TPMAlgSha512:  "SHA512",
+	TPMAlgSm3s256: "SM3S256",
+}
+
 func stripControlSequences(str string) string {
 	b := make([]byte, len(str))
 	var bl int
